@@ -1,33 +1,20 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Chat from "@/components/Chat";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "Rutas del Pacífico",
-  description:
-    "App de turismo con mapa interactivo de destinos, playas y reservas naturales.",
+  title: "MapAI Costa Rica | Exploraci?n e Itinerarios Inteligentes",
+  description: "Descubre gemas ocultas, itinerarios personalizados y mapas interactivos en Costa Rica impulsados por Inteligencia Artificial.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html
-      lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
+    <html lang="es">
+      <body class="antialiased bg-slate-900 text-slate-100 min-h-screen">
         {children}
-        <Chat />
       </body>
     </html>
   );
