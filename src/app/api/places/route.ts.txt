@@ -1,0 +1,118 @@
+import { NextResponse } from 'next/server';
+
+const MOCK_PLACES = [
+  {
+    id: '1',
+    name: 'Teatro Nacional de Costa Rica',
+    region: 'San José',
+    category: 'Cultura',
+    short_description: 'Joya arquitectónica de 1897 ubicada en el corazón de San José.',
+    ai_story: 'Inaugurado con la ópera Faust, es el símbolo cultural más emblemático del país con frescos e historia cafetalera.',
+    tags: ['cultura', 'arquitectura', 'historia'],
+    estimated_price_usd: 15,
+    rating: 4.9,
+    location: { type: 'Point', coordinates: [-84.0768, 9.9331] }
+  },
+  {
+    id: '2',
+    name: 'Museo del Oro Precolombino',
+    region: 'San José',
+    category: 'Cultura',
+    short_description: 'Extraordinaria colección de objetos de oro precolombino bajo la Plaza de la Cultura.',
+    ai_story: 'Alberga más de 1,500 piezas indígenas de oro que reflejan la cosmovisión y maestría metalúrgica ancestral.',
+    tags: ['museo', 'historia', 'arte'],
+    estimated_price_usd: 12,
+    rating: 4.8,
+    location: { type: 'Point', coordinates: [-84.0769, 9.9336] }
+  },
+  {
+    id: '3',
+    name: 'Volcán Arenal',
+    region: 'La Fortuna / San Carlos',
+    category: 'Naturaleza',
+    short_description: 'Estratovolcán icónico rodeado de bosque lluvioso y termales.',
+    ai_story: 'Con su forma cónica casi perfecta, es el eje del turismo de aventura y bienestar en la zona norte.',
+    tags: ['volcan', 'naturaleza', 'senderismo'],
+    estimated_price_usd: 18,
+    rating: 4.9,
+    location: { type: 'Point', coordinates: [-84.7031, 10.4633] }
+  },
+  {
+    id: '4',
+    name: 'Catarata Río Fortuna',
+    region: 'La Fortuna / San Carlos',
+    category: 'Aventura',
+    short_description: 'Impresionante caída de agua de 70 metros rodeada de exuberante vegetación.',
+    ai_story: 'Requiere bajar más de 500 escalones, recompensando a los visitantes con una poza natural cristalina.',
+    tags: ['catarata', 'aventura', 'natacion'],
+    estimated_price_usd: 20,
+    rating: 4.8,
+    location: { type: 'Point', coordinates: [-84.6683, 10.4419] }
+  },
+  {
+    id: '5',
+    name: 'Parque Nacional Manuel Antonio',
+    region: 'Manuel Antonio',
+    category: 'Naturaleza',
+    short_description: 'El parque nacional más popular con playas de arena blanca y abundante fauna.',
+    ai_story: 'Famoso por sus monos perezosos, mapaches y el contraste perfecto entre selva tropical y Océano Pacífico.',
+    tags: ['playa', 'fauna', 'parque nacional'],
+    estimated_price_usd: 18,
+    rating: 4.9,
+    location: { type: 'Point', coordinates: [-84.1383, 9.3892] }
+  },
+  {
+    id: '6',
+    name: 'Playa Espadilla Norte',
+    region: 'Manuel Antonio',
+    category: 'Naturaleza',
+    short_description: 'Extensa playa pública idónea para surfistas, atardeceres y caminatas.',
+    ai_story: 'Punto de encuentro ideal en Quepos para disfrutar de deportes acuáticos y gastronomía costera.',
+    tags: ['playa', 'surf', 'atardecer'],
+    estimated_price_usd: 0,
+    rating: 4.7,
+    location: { type: 'Point', coordinates: [-84.1432, 9.3981] }
+  },
+  {
+    id: '7',
+    name: 'Playa Tamarindo',
+    region: 'Guanacaste',
+    category: 'Aventura',
+    short_description: 'Mecca del surf, vida nocturna y gastronomía en el Pacífico Norte.',
+    ai_story: 'Antiguo pueblo pesquero transformado en un hub internacional con olas constantes para todos los niveles.',
+    tags: ['surf', 'vida nocturna', 'playa'],
+    estimated_price_usd: 0,
+    rating: 4.6,
+    location: { type: 'Point', coordinates: [-85.8402, 10.2993] }
+  },
+  {
+    id: '8',
+    name: 'Playa Conchal',
+    region: 'Guanacaste',
+    category: 'Naturaleza',
+    short_description: 'Famosa playa cuya arena está compuesta por millones de conchas trituradas.',
+    ai_story: 'Sus aguas turquesas y cristalinas la convierten en uno de los mejores puntos para esnórquel en Guanacaste.',
+    tags: ['esnorquel', 'playa', 'exclusivo'],
+    estimated_price_usd: 0,
+    rating: 4.9,
+    location: { type: 'Point', coordinates: [-85.8117, 10.3951] }
+  }
+];
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const region = searchParams.get('region');
+  const category = searchParams.get('category');
+
+  let filtered = [...MOCK_PLACES];
+
+  if (region && region !== 'Todas') {
+    filtered = filtered.filter((p) => p.region === region);
+  }
+
+  if (category && category !== 'Todas') {
+    filtered = filtered.filter((p) => p.category === category);
+  }
+
+  return NextResponse.json(filtered);
+}
