@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "mi-app-turismo",
   "version": "0.1.0",
   "private": true,
@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "16.4.0",
+    "next": "15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
