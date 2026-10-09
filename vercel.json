@@ -1,16 +1,1 @@
-﻿{
-  "crons": [
-    {
-      "path": "/api/cron/blog-scraper",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/viral-scraper",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/social-scraper",
-      "schedule": "0 14 * * *"
-    }
-  ]
-}
+﻿{"crons":[{"path":"/api/cron/blog-scraper","schedule":"0 2 * * *"},{"path":"/api/cron/viral-scraper","schedule":"0 8 * * *"},{"path":"/api/cron/social-scraper","schedule":"0 14 * * *"}]}
