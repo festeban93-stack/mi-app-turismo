@@ -12,6 +12,17 @@ function extractJSON(text: string) {
   return JSON.parse(cleaned);
 }
 
+// Sanitizador de Coordenadas Geográficas PostGIS
+function parseCoordinate(value: any, fallback: number): number {
+  if (typeof value === 'number' && !isNaN(value)) return value;
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[^0-9.-]/g, '');
+    const parsed = parseFloat(cleaned);
+    if (!isNaN(parsed)) return parsed;
+  }
+  return fallback;
+}
+
 export async function POST(request: Request) {
   try {
     const rawApiKey = process.env.GEMINI_API_KEY || '';
@@ -39,7 +50,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const canton = body.canton || 'La Fortuna, San Carlos';
 
-    // 1. Descubrimiento Dinámico de Modelos activos en la API Key
+    // 1. Descubrimiento Dinámico de Modelos activos
     const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
     const listData = await listRes.json().catch(() => ({}));
 
@@ -50,7 +61,6 @@ export async function POST(request: Request) {
       }, { status: 200 });
     }
 
-    // Filtrar modelos que soporten generateContent
     let availableModels = listData?.models
       ?.filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
       ?.map((m: any) => m.name.replace('models/', '')) || [];
@@ -58,18 +68,17 @@ export async function POST(request: Request) {
     if (availableModels.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'No se encontraron modelos con generateContent habilitado para esta API Key.',
+        error: 'No se encontraron modelos habilitados para esta API Key.',
       }, { status: 200 });
     }
 
-    // Priorizar modelos modernos en la ordenación
     availableModels.sort((a: string, b: string) => {
       if (a.includes('flash') && !b.includes('flash')) return -1;
       if (!a.includes('flash') && b.includes('flash')) return 1;
       return 0;
     });
 
-    const promptText = `Genera exactamente 5 puntos de interés, miradores, restaurantes tradicionales o cataratas reales en la zona o cantón de: "${canton}", Costa Rica.`;
+    const promptText = `Genera exactamente 5 puntos de interés, miradores, restaurantes tradicionales o cataratas reales en la zona de: "${canton}", Costa Rica.`;
 
     const jsonSchema = {
       type: "ARRAY",
@@ -96,12 +105,10 @@ export async function POST(request: Request) {
     let usedModel = '';
     let lastErrorDetails = '';
 
-    // 2. Bucle Retry en Cascada sobre TODOS los modelos descubiertos
     for (const modelName of availableModels) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
       try {
-        // Intento con Structured Outputs
         let res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -115,7 +122,6 @@ export async function POST(request: Request) {
           })
         });
 
-        // Fallback sin schema en caso de inconsistencia de la API
         if (!res.ok) {
           res = await fetch(endpoint, {
             method: 'POST',
@@ -136,7 +142,7 @@ export async function POST(request: Request) {
           if (text) {
             rawText = text;
             usedModel = modelName;
-            break; // ¡Modelo exitoso encontrado!
+            break;
           }
         } else {
           const errJson = await res.json().catch(() => ({}));
@@ -150,7 +156,7 @@ export async function POST(request: Request) {
     if (!rawText) {
       return NextResponse.json({
         success: false,
-        error: `Ningún modelo respondio con éxito. Modelos probados: [${availableModels.join(', ')}]. Último error: ${lastErrorDetails}`,
+        error: `Ningún modelo respondió con éxito. Último error: ${lastErrorDetails}`,
       }, { status: 200 });
     }
 
@@ -165,19 +171,25 @@ export async function POST(request: Request) {
       }, { status: 200 });
     }
 
-    const rowsToInsert = spotsData.map((spot: any) => ({
-      title: spot.title,
-      description: spot.description,
-      category: ['gastronomia', 'naturaleza', 'aventura', 'cultura', 'hospedaje'].includes(spot.category)
-        ? spot.category
-        : 'naturaleza',
-      location: `SRID=4326;POINT(${spot.longitude} ${spot.latitude})`,
-      address_text: spot.address_text || canton,
-      opening_hours: spot.opening_hours || 'Lunes a Domingo: 8:00 AM - 5:00 PM',
-      entry_fee: spot.entry_fee || 'Entrada Libre',
-      source_type: 'ai_scraper',
-      is_verified: true,
-    }));
+    // Sanitización y armado de registros
+    const rowsToInsert = spotsData.map((spot: any) => {
+      const lat = parseCoordinate(spot.latitude, 9.7489);
+      const lng = parseCoordinate(spot.longitude, -83.7534);
+
+      return {
+        title: spot.title || 'Punto de Interés Local',
+        description: spot.description || 'Atractivo turístico por explorar.',
+        category: ['gastronomia', 'naturaleza', 'aventura', 'cultura', 'hospedaje'].includes(spot.category)
+          ? spot.category
+          : 'naturaleza',
+        location: `SRID=4326;POINT(${lng} ${lat})`,
+        address_text: spot.address_text || canton,
+        opening_hours: spot.opening_hours || 'Lunes a Domingo: 8:00 AM - 5:00 PM',
+        entry_fee: spot.entry_fee || 'Entrada Libre',
+        source_type: 'ai_scraper',
+        is_verified: true,
+      };
+    });
 
     const { data: insertedData, error: dbError } = await supabaseAdmin
       .from('spots')
