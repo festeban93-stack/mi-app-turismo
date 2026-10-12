@@ -1,6 +1,17 @@
 ﻿import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// Funcion sanitizadora para extraer JSON estricto
+function extractAndParseJSON(rawText: string) {
+  let cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const firstBracket = cleaned.indexOf('[');
+  const lastBracket = cleaned.lastIndexOf(']');
+  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+    cleaned = cleaned.substring(firstBracket, lastBracket + 1);
+  }
+  return JSON.parse(cleaned);
+}
+
 export async function POST(request: Request) {
   try {
     const rawApiKey = process.env.GEMINI_API_KEY || '';
@@ -30,7 +41,7 @@ export async function POST(request: Request) {
 
     const promptText = `Actúa como un mapa turístico de Costa Rica. Genera exactamente 5 puntos de interés, miradores, restaurantes tradicionales o cataratas en la zona de: "${canton}".
 
-Devuelve ÚNICAMENTE un arreglo JSON válido sin formato Markdown ni texto extra. Formato requerido:
+Devuelve ÚNICAMENTE un arreglo JSON válido con el siguiente formato:
 [
   {
     "title": "Nombre del lugar",
@@ -45,13 +56,9 @@ Devuelve ÚNICAMENTE un arreglo JSON válido sin formato Markdown ni texto extra
 ]
 Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cultura", "hospedaje".`;
 
-    // Lista de modelos exactos para probar directamente vía REST
     const candidateModels = [
       'gemini-2.0-flash',
-      'gemini-1.5-flash-002',
-      'gemini-1.5-flash-001',
       'gemini-1.5-flash',
-      'gemini-1.5-pro-002',
       'gemini-1.5-pro'
     ];
 
@@ -59,7 +66,7 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
     let usedModel = '';
     let lastErrorDetails = '';
 
-    // 1. Probar modelos conocidos vía HTTP REST
+    // 1. Probar modelos candidatos forzando respuesta JSON pura
     for (const modelName of candidateModels) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
       try {
@@ -67,7 +74,10 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }]
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: {
+              response_mime_type: 'application/json'
+            }
           })
         });
 
@@ -88,7 +98,7 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
       }
     }
 
-    // 2. Si fallan los nombres estáticos, consultar la lista viva de modelos permitidos para esta API Key
+    // 2. Fallback de descubrimiento dinámico si fuera necesario
     if (!rawText) {
       try {
         const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
@@ -98,34 +108,28 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
           ?.filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
           ?.map((m: any) => m.name.replace('models/', '')) || [];
 
-        if (availableModels.length > 0) {
-          for (const modelName of availableModels) {
-            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-            const res = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: promptText }] }]
-              })
-            });
-
-            if (res.ok) {
-              const data = await res.json();
-              const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (text) {
-                rawText = text;
-                usedModel = modelName;
-                break;
+        for (const modelName of availableModels) {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptText }] }],
+              generationConfig: {
+                response_mime_type: 'application/json'
               }
+            })
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              rawText = text;
+              usedModel = modelName;
+              break;
             }
           }
-        }
-
-        if (!rawText) {
-          return NextResponse.json({
-            success: false,
-            error: `Modelos disponibles en tu API Key: [${availableModels.join(', ')}]. Detalle del error: ${lastErrorDetails}`,
-          }, { status: 200 });
         }
       } catch (discoveryErr: any) {
         console.error('Error en auto-descubrimiento:', discoveryErr);
@@ -135,21 +139,21 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
     if (!rawText) {
       return NextResponse.json({
         success: false,
-        error: `No se pudo obtener respuesta de Gemini. Detalle: ${lastErrorDetails}`,
+        error: `No se obtuvo respuesta de la IA. Detalle: ${lastErrorDetails}`,
       }, { status: 200 });
     }
 
-    const jsonMatch = rawText.match(/\[\s*\{[\s\S]*\}\s*\]/);
-    if (!jsonMatch) {
+    let spotsData: any[] = [];
+    try {
+      spotsData = extractAndParseJSON(rawText);
+    } catch (parseErr: any) {
       return NextResponse.json({
         success: false,
-        error: 'La respuesta de Gemini no contenía un JSON válido.',
+        error: `Error parseando JSON sanitizado: ${parseErr.message}`,
         usedModel,
         rawText,
       }, { status: 200 });
     }
-
-    const spotsData = JSON.parse(jsonMatch[0]);
 
     const rowsToInsert = spotsData.map((spot: any) => ({
       title: spot.title,
