@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,7 @@ const MapContainer = dynamicNext(() => import('@/components/MapComponent'), {
   loading: () => (
     <div className="w-full h-full flex items-center justify-center bg-slate-900 text-cyan-400">
       <div className="flex flex-col items-center gap-2">
-        <span className="animate-spin text-3xl">??</span>
+        <span className="animate-spin text-3xl">🌐</span>
         <span className="text-xs font-mono">Cargando Mapa de Costa Rica...</span>
       </div>
     </div>
@@ -77,23 +77,23 @@ export default function HomePage() {
 
   return (
     <main className="relative w-screen h-screen overflow-hidden bg-slate-950 flex flex-col md:flex-row">
-      <header className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between gap-3 bg-slate-900/80 backdrop-blur-md p-3.5 rounded-2xl border border-slate-800 shadow-2xl max-w-xl mx-auto md:mx-0 md:left-6">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">????</span>
+      <header className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between gap-3 bg-slate-900/90 backdrop-blur-md p-3.5 rounded-2xl border border-slate-800 shadow-2xl max-w-xl mx-auto md:mx-0 md:left-6">
+        <div className="flex items-center gap-2.5">
+          <span className="text-2xl">🇨🇷</span>
           <div>
             <h1 className="text-sm font-black bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent leading-none">
               MapAI Costa Rica
             </h1>
-            <p className="text-[10px] text-slate-400 font-medium">Exploracion e Itinerarios con IA</p>
+            <p className="text-[10px] text-slate-400 font-medium">Exploración e Itinerarios con IA</p>
           </div>
         </div>
 
-        <div className="flex gap-1.5 overflow-x-auto max-w-[220px] sm:max-w-none no-scrollbar">
+        <div className="flex gap-1.5 overflow-x-auto max-w-[220px] sm:max-w-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {['todas', 'gastronomia', 'naturaleza', 'aventura', 'cultura'].map((cat) => (
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat === 'todas' ? null : cat)}
-              className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold capitalize transition-all whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold capitalize transition-all whitespace-nowrap ${
                 (cat === 'todas' && categoryFilter === null) || categoryFilter === cat
                   ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
                   : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
@@ -125,7 +125,7 @@ export default function HomePage() {
       )}
 
       <button className="absolute bottom-6 right-6 z-40 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 px-4 py-3 rounded-full font-extrabold text-xs shadow-2xl shadow-cyan-500/40 hover:scale-105 transition-all flex items-center gap-2">
-        <span>??</span>
+        <span>🤖</span>
         <span>Copiloto IA</span>
       </button>
     </main>

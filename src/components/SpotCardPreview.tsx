@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
@@ -53,7 +53,7 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
     const distToSpotMeters = R * c;
 
     if (distToSpotMeters > 500) {
-      setErrorMessage(`Estas demasiado lejos (${(distToSpotMeters / 1000).toFixed(1)} km). Debes estar a menos de 500m del lugar.`);
+      setErrorMessage(`Estás demasiado lejos (${(distToSpotMeters / 1000).toFixed(1)} km). Debes estar a menos de 500m del lugar.`);
       setCheckinStatus('error');
       return;
     }
@@ -84,22 +84,22 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
         </div>
         {onClose && (
           <button onClick={onClose} className="text-slate-400 hover:text-white p-1 text-lg">
-            ?
+            ✕
           </button>
         )}
       </div>
 
       <div className="grid grid-cols-1 gap-2 text-xs bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
         <div className="flex items-center gap-2 text-slate-300">
-          <span className="text-base">??</span>
+          <span className="text-base">🕒</span>
           <div>
-            <span className="font-semibold text-slate-400 block text-[10px]">HORARIO DE ATENCION</span>
+            <span className="font-semibold text-slate-400 block text-[10px]">HORARIO DE ATENCIÓN</span>
             <span>{spot.opening_hours || 'Lunes a Domingo: 8:00 AM - 5:00 PM'}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-slate-300 border-t border-slate-700/50 pt-2">
-          <span className="text-base">???</span>
+          <span className="text-base">🎟️</span>
           <div>
             <span className="font-semibold text-slate-400 block text-[10px]">COSTO / ENTRADA</span>
             <span className="text-emerald-400 font-medium">{spot.entry_fee || 'Entrada Libre / Gratis'}</span>
@@ -107,9 +107,9 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
         </div>
 
         <div className="flex items-center gap-2 text-slate-300 border-t border-slate-700/50 pt-2">
-          <span className="text-base">??</span>
+          <span className="text-base">📍</span>
           <div>
-            <span className="font-semibold text-slate-400 block text-[10px]">DIRECCION Y UBICACION</span>
+            <span className="font-semibold text-slate-400 block text-[10px]">DIRECCIÓN Y UBICACIÓN</span>
             <span>{spot.address_text || 'Costa Rica'}</span>
             <span className="text-[10px] text-cyan-400 block mt-0.5 font-mono">
               a {(spot.distance_meters / 1000).toFixed(1)} km de ti
@@ -127,7 +127,7 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
       <div className="pt-2 border-t border-slate-800 flex flex-col gap-2">
         <div className="flex justify-between items-center text-xs text-slate-400">
           <span className="flex items-center gap-1">
-            ?? <strong className="text-white">{localCheckinCount}</strong> Exploradores han hecho Check-in
+            📍 <strong className="text-white">{localCheckinCount}</strong> Exploradores han hecho Check-in
           </span>
           <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-cyan-300">
             +50 Pts
@@ -136,7 +136,7 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
 
         {checkinStatus === 'success' ? (
           <div className="bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs p-2.5 rounded-xl text-center font-semibold">
-            ?Check-in registrado con exito! ?? +50 Puntos de Explorador.
+            ¡Check-in registrado con éxito! 🎉 +50 Puntos de Explorador.
           </div>
         ) : (
           <button
@@ -148,8 +148,8 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
               <span>Validando GPS...</span>
             ) : (
               <>
-                <span>??</span>
-                <span>Hacer Check-in Aqui (Verificar Presencia)</span>
+                <span>📍</span>
+                <span>Hacer Check-in Aquí (Verificar Presencia)</span>
               </>
             )}
           </button>
