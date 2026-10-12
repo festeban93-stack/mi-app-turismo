@@ -1,5 +1,4 @@
 ﻿import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: Request) {
@@ -29,13 +28,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const canton = body.canton || 'La Fortuna, San Carlos';
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    const candidateModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro'];
-    let rawText = '';
-    let lastError: any = null;
-
-    const prompt = `Actúa como un mapa turístico de Costa Rica. Genera exactamente 5 puntos de interés, miradores, restaurantes tradicionales o cataratas en la zona de: "${canton}".
+    const promptText = `Actúa como un mapa turístico de Costa Rica. Genera exactamente 5 puntos de interés, miradores, restaurantes tradicionales o cataratas en la zona de: "${canton}".
 
 Devuelve ÚNICAMENTE un arreglo JSON válido sin formato Markdown ni texto extra. Formato requerido:
 [
@@ -52,44 +45,86 @@ Devuelve ÚNICAMENTE un arreglo JSON válido sin formato Markdown ni texto extra
 ]
 Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cultura", "hospedaje".`;
 
-    // 1. Probar modelos candidatos principales
+    // Lista de modelos exactos para probar directamente vía REST
+    const candidateModels = [
+      'gemini-2.0-flash',
+      'gemini-1.5-flash-002',
+      'gemini-1.5-flash-001',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro-002',
+      'gemini-1.5-pro'
+    ];
+
+    let rawText = '';
+    let usedModel = '';
+    let lastErrorDetails = '';
+
+    // 1. Probar modelos conocidos vía HTTP REST
     for (const modelName of candidateModels) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const response = await model.generateContent(prompt);
-        rawText = response.response.text();
-        if (rawText) break;
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }]
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            rawText = text;
+            usedModel = modelName;
+            break;
+          }
+        } else {
+          const errJson = await res.json().catch(() => ({}));
+          lastErrorDetails = `[${modelName}] Status ${res.status}: ${JSON.stringify(errJson)}`;
+        }
       } catch (err: any) {
-        lastError = err;
+        lastErrorDetails = err?.message || 'Error de conexión HTTP';
       }
     }
 
-    // 2. Si fallan los nombres estáticos, ejecutar Auto-Descubrimiento Dinámico de Modelos
+    // 2. Si fallan los nombres estáticos, consultar la lista viva de modelos permitidos para esta API Key
     if (!rawText) {
       try {
         const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-        const listData = await listRes.json();
+        const listData = await listRes.json().catch(() => ({}));
         
-        if (listData.models && Array.isArray(listData.models)) {
-          const validModel = listData.models.find((m: any) => 
-            m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent')
-          );
-          
-          if (validModel) {
-            const cleanModelName = validModel.name.replace('models/', '');
-            const model = genAI.getGenerativeModel({ model: cleanModelName });
-            const response = await model.generateContent(prompt);
-            rawText = response.response.text();
-          } else {
-            return NextResponse.json({
-              success: false,
-              error: `Modelos no encontrados con generateContent. Respuesta API: ${JSON.stringify(listData)}`,
-            }, { status: 200 });
+        const availableModels = listData?.models
+          ?.filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
+          ?.map((m: any) => m.name.replace('models/', '')) || [];
+
+        if (availableModels.length > 0) {
+          for (const modelName of availableModels) {
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+            const res = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: promptText }] }]
+              })
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (text) {
+                rawText = text;
+                usedModel = modelName;
+                break;
+              }
+            }
           }
-        } else if (listData.error) {
+        }
+
+        if (!rawText) {
           return NextResponse.json({
             success: false,
-            error: `Error de Google AI API: ${listData.error.message} (Código: ${listData.error.code})`,
+            error: `Modelos disponibles en tu API Key: [${availableModels.join(', ')}]. Detalle del error: ${lastErrorDetails}`,
           }, { status: 200 });
         }
       } catch (discoveryErr: any) {
@@ -100,7 +135,7 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
     if (!rawText) {
       return NextResponse.json({
         success: false,
-        error: `Fallo en SDK Gemini. Último error: ${lastError?.message || 'Sin respuesta de modelos'}`,
+        error: `No se pudo obtener respuesta de Gemini. Detalle: ${lastErrorDetails}`,
       }, { status: 200 });
     }
 
@@ -109,6 +144,7 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
       return NextResponse.json({
         success: false,
         error: 'La respuesta de Gemini no contenía un JSON válido.',
+        usedModel,
         rawText,
       }, { status: 200 });
     }
@@ -144,6 +180,7 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
     return NextResponse.json({
       success: true,
       canton_processed: canton,
+      model_used: usedModel,
       inserted_count: data?.length || 0,
     }, { status: 200 });
 
