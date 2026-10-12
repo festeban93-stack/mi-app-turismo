@@ -1,6 +1,17 @@
 ﻿import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// Extractor de respaldo para JSON en caso de modelos sin soporte de schema estricto
+function extractJSON(text: string) {
+  let cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const start = cleaned.indexOf('[');
+  const end = cleaned.lastIndexOf(']');
+  if (start !== -1 && end !== -1 && end > start) {
+    cleaned = cleaned.substring(start, end + 1);
+  }
+  return JSON.parse(cleaned);
+}
+
 export async function POST(request: Request) {
   try {
     const rawApiKey = process.env.GEMINI_API_KEY || '';
@@ -9,7 +20,7 @@ export async function POST(request: Request) {
     if (!apiKey) {
       return NextResponse.json({
         success: false,
-        error: 'GEMINI_API_KEY no está configurada o está vacía en Vercel.',
+        error: 'GEMINI_API_KEY no está configurada en Vercel.',
       }, { status: 200 });
     }
 
@@ -28,9 +39,33 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const canton = body.canton || 'La Fortuna, San Carlos';
 
+    // 1. Descubrimiento Dinámico de Modelos activos en la API Key
+    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    const listData = await listRes.json().catch(() => ({}));
+
+    if (listData.error) {
+      return NextResponse.json({
+        success: false,
+        error: `Error de Google AI API Key: ${listData.error.message}`,
+      }, { status: 200 });
+    }
+
+    const availableModels = listData?.models
+      ?.filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
+      ?.map((m: any) => m.name.replace('models/', '')) || [];
+
+    if (availableModels.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'No se encontraron modelos con generateContent habilitado para esta API Key.',
+      }, { status: 200 });
+    }
+
+    // Priorizar modelos flash o tomar el primero disponible
+    const selectedModel = availableModels.find((m: string) => m.includes('flash')) || availableModels[0];
+
     const promptText = `Genera exactamente 5 puntos de interés, miradores, restaurantes tradicionales o cataratas reales en la zona o cantón de: "${canton}", Costa Rica.`;
 
-    // Definicion de Esquema Estructurado (Structured Output)
     const jsonSchema = {
       type: "ARRAY",
       items: {
@@ -52,66 +87,62 @@ export async function POST(request: Request) {
       }
     };
 
-    const candidateModels = [
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
-      'gemini-1.5-pro'
-    ];
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
 
-    let rawText = '';
-    let usedModel = '';
-    let lastErrorDetails = '';
-
-    // Probar modelos candidatos forzando Structured Outputs
-    for (const modelName of candidateModels) {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-      try {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-            generationConfig: {
-              response_mime_type: 'application/json',
-              response_schema: jsonSchema,
-              temperature: 0.1
-            }
-          })
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            rawText = text;
-            usedModel = modelName;
-            break;
-          }
-        } else {
-          const errJson = await res.json().catch(() => ({}));
-          lastErrorDetails = `[${modelName}] Status ${res.status}: ${JSON.stringify(errJson)}`;
+    // Intento 1: Llamada con Structured Outputs
+    let res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: promptText }] }],
+        generationConfig: {
+          response_mime_type: 'application/json',
+          response_schema: jsonSchema,
+          temperature: 0.2
         }
-      } catch (err: any) {
-        lastErrorDetails = err?.message || 'Error de conexión HTTP';
-      }
+      })
+    });
+
+    // Intento 2: Fallback sin schema si el modelo seleccionado no soporta response_schema
+    if (!res.ok) {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText + " Devuelve únicamente un JSON array estructurado." }] }],
+          generationConfig: {
+            response_mime_type: 'application/json',
+            temperature: 0.2
+          }
+        })
+      });
     }
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      return NextResponse.json({
+        success: false,
+        error: `Fallo HTTP en modelo [${selectedModel}]: ${JSON.stringify(errJson)}`,
+      }, { status: 200 });
+    }
+
+    const data = await res.json();
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     if (!rawText) {
       return NextResponse.json({
         success: false,
-        error: `No se obtuvo respuesta de la IA. Detalle: ${lastErrorDetails}`,
+        error: `El modelo [${selectedModel}] devolvió una respuesta vacía.`,
       }, { status: 200 });
     }
 
     let spotsData: any[] = [];
     try {
-      spotsData = JSON.parse(rawText);
+      spotsData = extractJSON(rawText);
     } catch (parseErr: any) {
       return NextResponse.json({
         success: false,
-        error: `Error parseando JSON estructurado: ${parseErr.message}`,
-        usedModel,
+        error: `Error parseando JSON (${parseErr.message}) en modelo [${selectedModel}].`,
         rawText,
       }, { status: 200 });
     }
@@ -130,23 +161,23 @@ export async function POST(request: Request) {
       is_verified: true,
     }));
 
-    const { data, error } = await supabaseAdmin
+    const { data: insertedData, error: dbError } = await supabaseAdmin
       .from('spots')
       .insert(rowsToInsert)
       .select();
 
-    if (error) {
+    if (dbError) {
       return NextResponse.json({
         success: false,
-        error: `Error Supabase Insert: ${error.message}`,
+        error: `Error Supabase Insert: ${dbError.message}`,
       }, { status: 200 });
     }
 
     return NextResponse.json({
       success: true,
       canton_processed: canton,
-      model_used: usedModel,
-      inserted_count: data?.length || 0,
+      model_used: selectedModel,
+      inserted_count: insertedData?.length || 0,
     }, { status: 200 });
 
   } catch (error: any) {
