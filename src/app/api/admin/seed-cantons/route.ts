@@ -30,8 +30,11 @@ export async function POST(request: Request) {
     const canton = body.canton || 'La Fortuna, San Carlos';
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Uso del nombre de modelo soportado por la v1beta de la API
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+    
+    // Lista de modelos candidate con fallback automatico
+    const candidateModels = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+    let rawText = '';
+    let lastError: any = null;
 
     const prompt = `Actúa como un mapa turístico de Costa Rica. Genera exactamente 5 puntos de interés, miradores, restaurantes tradicionales o cataratas en la zona de: "${canton}".
 
@@ -50,8 +53,23 @@ Devuelve ÚNICAMENTE un arreglo JSON válido sin formato Markdown ni texto extra
 ]
 Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cultura", "hospedaje".`;
 
-    const response = await model.generateContent(prompt);
-    const rawText = response.response.text();
+    for (const modelName of candidateModels) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const response = await model.generateContent(prompt);
+        rawText = response.response.text();
+        if (rawText) break;
+      } catch (err: any) {
+        lastError = err;
+      }
+    }
+
+    if (!rawText) {
+      return NextResponse.json({
+        success: false,
+        error: `Fallo en SDK Gemini (Modelos probados: ${candidateModels.join(', ')}): ${lastError?.message || 'Sin respuesta'}`,
+      }, { status: 200 });
+    }
 
     const jsonMatch = rawText.match(/\[\s*\{[\s\S]*\}\s*\]/);
     if (!jsonMatch) {
@@ -99,7 +117,7 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      error: `Error de SDK Gemini: ${error?.message || 'Error desconocido'}`,
+      error: `Excepción en servidor: ${error?.message || 'Error desconocido'}`,
     }, { status: 200 });
   }
 }
