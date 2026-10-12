@@ -4,85 +4,67 @@ import { supabase } from '@/lib/supabaseClient';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-// Cantones clave de Costa Rica organizados por regiones turísticas
-const CANTONES_COSTA_RICA = [
-  'San Carlos (La Fortuna, Ciudad Quesada)',
-  'Garabito (Jacó, Tarcoles)',
-  'Quepos (Manuel Antonio)',
-  'Pococí (Tortuguero)',
-  'Talamanca (Puerto Viejo, Cahuita)',
-  'Santa Cruz (Tamarindo, Conchal)',
-  'Nicoya (Nosara, Samara)',
-  'Monteverde',
-  'Osa (Drake, Puerto Jiménez)',
-  'Pérez Zeledón (San Gerardo, Chirripó)',
-  'Sarapiquí',
-  'Paraíso (Orosi, Ujarrás)',
-  'Zarcero',
-  'Poás',
-  'Escazú y Santa Ana'
-];
-
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const cantonesToProcess = body.cantones || CANTONES_COSTA_RICA.slice(0, 3);
+    const canton = body.canton || 'La Fortuna, San Carlos';
+
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json({ error: 'GEMINI_API_KEY no configurada en Vercel' }, { status: 500 });
+    }
 
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    let totalInserted = 0;
-    const resultsSummary: Record<string, number> = {};
 
-    for (const canton of cantonesToProcess) {
-      const prompt = `Actúa como un guía turístico experto en Costa Rica. Genera exactamente 6 puntos de interés únicos, miradores, restaurantes tradicionales, cataratas o gemas poco conocidas en la zona de: "${canton}".
+    const prompt = `Actúa como guía turístico experto en Costa Rica. Genera exactamente 6 puntos de interés, miradores, restaurantes locales o gemas ocultas en la zona de: "${canton}".
 
-Devuelve ÚNICAMENTE un arreglo JSON válido (sin sintaxis markdown \`\`\`json) con el siguiente formato estricto:
+Devuelve ÚNICAMENTE un arreglo JSON válido (sin markdown ```json) con el siguiente formato:
 [
   {
     "title": "Nombre del lugar",
-    "description": "Descripción atractiva de 2 a 3 frases resaltando por qué visitarlo.",
-    "category": "gastronomia" | "naturaleza" | "aventura" | "cultura" | "hospedaje",
-    "latitude": 9.9999,
-    "longitude": -84.9999,
-    "address_text": "Dirección exacta o referencia local",
-    "opening_hours": "Horario estimado (ej. Lunes a Domingo 8:00 AM - 5:00 PM)",
-    "entry_fee": "Costo estimado (ej. Entrada Gratuita o ₡3,000 / $10 USD)"
+    "description": "Descripción de 2 frases enfocada en el atractivo.",
+    "category": "gastronomia",
+    "latitude": 10.4678,
+    "longitude": -84.6427,
+    "address_text": "Referencia local",
+    "opening_hours": "Lunes a Domingo 8:00 AM - 5:00 PM",
+    "entry_fee": "Entrada Gratuita"
   }
-]`;
+]
+Nota para category: usa solo uno de estos valores: "gastronomia", "naturaleza", "aventura", "cultura", "hospedaje".`;
 
-      const response = await model.generateContent(prompt);
-      const text = response.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-      const spotsData = JSON.parse(text);
+    const response = await model.generateContent(prompt);
+    const rawText = response.response.text();
+    const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const spotsData = JSON.parse(cleanText);
 
-      let insertedCount = 0;
-      for (const spot of spotsData) {
-        // Formato WKT geográfico para PostGIS
-        const wktPoint = `POINT(${spot.longitude} ${spot.latitude})`;
+    // Mapear datos a formato PostGIS y preparar insercion en lote
+    const rowsToInsert = spotsData.map((spot: any) => ({
+      title: spot.title,
+      description: spot.description,
+      category: ['gastronomia', 'naturaleza', 'aventura', 'cultura', 'hospedaje'].includes(spot.category) 
+        ? spot.category 
+        : 'naturaleza',
+      location: `POINT(${spot.longitude} ${spot.latitude})`,
+      address_text: spot.address_text || canton,
+      opening_hours: spot.opening_hours || 'Lunes a Domingo: 8:00 AM - 5:00 PM',
+      entry_fee: spot.entry_fee || 'Entrada Libre',
+      source_type: 'ai_scraper',
+      is_verified: true,
+    }));
 
-        const { error } = await supabase.from('spots').insert({
-          title: spot.title,
-          description: spot.description,
-          category: spot.category,
-          location: wktPoint,
-          address_text: spot.address_text,
-          opening_hours: spot.opening_hours,
-          entry_fee: spot.entry_fee,
-          source_type: 'ai_scraper',
-          is_verified: true,
-        });
+    const { data, error } = await supabase
+      .from('spots')
+      .insert(rowsToInsert)
+      .select();
 
-        if (!error) {
-          insertedCount++;
-          totalInserted++;
-        }
-      }
-
-      resultsSummary[canton] = insertedCount;
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
-      total_inserted: totalInserted,
-      summary: resultsSummary,
+      canton_processed: canton,
+      inserted_count: data?.length || 0,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
