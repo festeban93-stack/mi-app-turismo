@@ -30,7 +30,8 @@ export async function POST(request: Request) {
     const canton = body.canton || 'La Fortuna, San Carlos';
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // Uso del nombre de modelo soportado por la v1beta de la API
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
 
     const prompt = `Actúa como un mapa turístico de Costa Rica. Genera exactamente 5 puntos de interés, miradores, restaurantes tradicionales o cataratas en la zona de: "${canton}".
 
@@ -98,7 +99,7 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      error: `Error de Autenticación / SDK Gemini: ${error?.message || 'Error desconocido'}`,
+      error: `Error de SDK Gemini: ${error?.message || 'Error desconocido'}`,
     }, { status: 200 });
   }
 }
