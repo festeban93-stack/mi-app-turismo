@@ -2,20 +2,27 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 
-// Cliente de Supabase con privilegios administrativos (bypassa RLS)
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabaseAdmin = createClient(supabaseUrl, serviceKey);
-
 export async function POST(request: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json(
-        { success: false, error: 'GEMINI_API_KEY no configurada en Vercel.' },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: false,
+        error: 'GEMINI_API_KEY no está configurada en las variables de entorno de Vercel.',
+      }, { status: 200 });
     }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+    if (!supabaseUrl) {
+      return NextResponse.json({
+        success: false,
+        error: 'NEXT_PUBLIC_SUPABASE_URL no está configurada.',
+      }, { status: 200 });
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
     const body = await request.json().catch(() => ({}));
     const canton = body.canton || 'La Fortuna, San Carlos';
@@ -45,10 +52,11 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
 
     const jsonMatch = rawText.match(/\[\s*\{[\s\S]*\}\s*\]/);
     if (!jsonMatch) {
-      return NextResponse.json(
-        { success: false, error: 'La respuesta de la IA no contenía un JSON válido.', rawText },
-        { status: 500 }
-      );
+      return NextResponse.json({
+        success: false,
+        error: 'La respuesta de Gemini no contenía un JSON válido.',
+        rawText,
+      }, { status: 200 });
     }
 
     const spotsData = JSON.parse(jsonMatch[0]);
@@ -56,10 +64,10 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
     const rowsToInsert = spotsData.map((spot: any) => ({
       title: spot.title,
       description: spot.description,
-      category: ['gastronomia', 'naturaleza', 'aventura', 'cultura', 'hospedaje'].includes(spot.category) 
-        ? spot.category 
+      category: ['gastronomia', 'naturaleza', 'aventura', 'cultura', 'hospedaje'].includes(spot.category)
+        ? spot.category
         : 'naturaleza',
-      location: `POINT(${spot.longitude} ${spot.latitude})`,
+      location: `SRID=4326;POINT(${spot.longitude} ${spot.latitude})`,
       address_text: spot.address_text || canton,
       opening_hours: spot.opening_hours || 'Lunes a Domingo: 8:00 AM - 5:00 PM',
       entry_fee: spot.entry_fee || 'Entrada Libre',
@@ -73,18 +81,22 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
       .select();
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      return NextResponse.json({
+        success: false,
+        error: `Error Supabase Insert: ${error.message} (Detalles: ${error.details || 'N/A'})`,
+      }, { status: 200 });
     }
 
     return NextResponse.json({
       success: true,
       canton_processed: canton,
       inserted_count: data?.length || 0,
-    });
+    }, { status: 200 });
+
   } catch (error: any) {
-    return NextResponse.json(
-      { success: false, error: error.message || 'Error interno del servidor' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: `Excepción en servidor: ${error?.message || 'Error desconocido'}`,
+    }, { status: 200 });
   }
 }
