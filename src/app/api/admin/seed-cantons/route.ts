@@ -31,8 +31,7 @@ export async function POST(request: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Lista de modelos activos con fallback automatico
-    const candidateModels = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash-exp'];
+    const candidateModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro'];
     let rawText = '';
     let lastError: any = null;
 
@@ -53,6 +52,7 @@ Devuelve ÚNICAMENTE un arreglo JSON válido sin formato Markdown ni texto extra
 ]
 Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cultura", "hospedaje".`;
 
+    // 1. Probar modelos candidatos principales
     for (const modelName of candidateModels) {
       try {
         const model = genAI.getGenerativeModel({ model: modelName });
@@ -64,10 +64,43 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
       }
     }
 
+    // 2. Si fallan los nombres estáticos, ejecutar Auto-Descubrimiento Dinámico de Modelos
+    if (!rawText) {
+      try {
+        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        const listData = await listRes.json();
+        
+        if (listData.models && Array.isArray(listData.models)) {
+          const validModel = listData.models.find((m: any) => 
+            m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent')
+          );
+          
+          if (validModel) {
+            const cleanModelName = validModel.name.replace('models/', '');
+            const model = genAI.getGenerativeModel({ model: cleanModelName });
+            const response = await model.generateContent(prompt);
+            rawText = response.response.text();
+          } else {
+            return NextResponse.json({
+              success: false,
+              error: `Modelos no encontrados con generateContent. Respuesta API: ${JSON.stringify(listData)}`,
+            }, { status: 200 });
+          }
+        } else if (listData.error) {
+          return NextResponse.json({
+            success: false,
+            error: `Error de Google AI API: ${listData.error.message} (Código: ${listData.error.code})`,
+          }, { status: 200 });
+        }
+      } catch (discoveryErr: any) {
+        console.error('Error en auto-descubrimiento:', discoveryErr);
+      }
+    }
+
     if (!rawText) {
       return NextResponse.json({
         success: false,
-        error: `Fallo en SDK Gemini (Modelos probados: ${candidateModels.join(', ')}): ${lastError?.message || 'Sin respuesta'}`,
+        error: `Fallo en SDK Gemini. Último error: ${lastError?.message || 'Sin respuesta de modelos'}`,
       }, { status: 200 });
     }
 
