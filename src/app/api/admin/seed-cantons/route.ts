@@ -4,11 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: Request) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const rawApiKey = process.env.GEMINI_API_KEY || '';
+    const apiKey = rawApiKey.replace(/['"]/g, '').trim();
+
     if (!apiKey) {
       return NextResponse.json({
         success: false,
-        error: 'GEMINI_API_KEY no está configurada en las variables de entorno de Vercel.',
+        error: 'GEMINI_API_KEY no está configurada o está vacía en Vercel.',
       }, { status: 200 });
     }
 
@@ -83,7 +85,7 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
     if (error) {
       return NextResponse.json({
         success: false,
-        error: `Error Supabase Insert: ${error.message} (Detalles: ${error.details || 'N/A'})`,
+        error: `Error Supabase Insert: ${error.message}`,
       }, { status: 200 });
     }
 
@@ -96,7 +98,7 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      error: `Excepción en servidor: ${error?.message || 'Error desconocido'}`,
+      error: `Error de Autenticación / SDK Gemini: ${error?.message || 'Error desconocido'}`,
     }, { status: 200 });
   }
 }
