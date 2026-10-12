@@ -1,17 +1,6 @@
 ﻿import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Funcion sanitizadora para extraer JSON estricto
-function extractAndParseJSON(rawText: string) {
-  let cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-  const firstBracket = cleaned.indexOf('[');
-  const lastBracket = cleaned.lastIndexOf(']');
-  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
-    cleaned = cleaned.substring(firstBracket, lastBracket + 1);
-  }
-  return JSON.parse(cleaned);
-}
-
 export async function POST(request: Request) {
   try {
     const rawApiKey = process.env.GEMINI_API_KEY || '';
@@ -39,24 +28,32 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const canton = body.canton || 'La Fortuna, San Carlos';
 
-    const promptText = `Actúa como un mapa turístico de Costa Rica. Genera exactamente 5 puntos de interés, miradores, restaurantes tradicionales o cataratas en la zona de: "${canton}".
+    const promptText = `Genera exactamente 5 puntos de interés, miradores, restaurantes tradicionales o cataratas reales en la zona o cantón de: "${canton}", Costa Rica.`;
 
-Devuelve ÚNICAMENTE un arreglo JSON válido con el siguiente formato:
-[
-  {
-    "title": "Nombre del lugar",
-    "description": "Descripción de 2 frases enfocada en la experiencia.",
-    "category": "gastronomia",
-    "latitude": 10.4678,
-    "longitude": -84.6427,
-    "address_text": "Referencia local",
-    "opening_hours": "Lunes a Domingo 8:00 AM - 5:00 PM",
-    "entry_fee": "Entrada Gratuita"
-  }
-]
-Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cultura", "hospedaje".`;
+    // Definicion de Esquema Estructurado (Structured Output)
+    const jsonSchema = {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          title: { type: "STRING" },
+          description: { type: "STRING" },
+          category: {
+            type: "STRING",
+            enum: ["gastronomia", "naturaleza", "aventura", "cultura", "hospedaje"]
+          },
+          latitude: { type: "NUMBER" },
+          longitude: { type: "NUMBER" },
+          address_text: { type: "STRING" },
+          opening_hours: { type: "STRING" },
+          entry_fee: { type: "STRING" }
+        },
+        required: ["title", "description", "category", "latitude", "longitude", "address_text", "opening_hours", "entry_fee"]
+      }
+    };
 
     const candidateModels = [
+      'gemini-2.5-flash',
       'gemini-2.0-flash',
       'gemini-1.5-flash',
       'gemini-1.5-pro'
@@ -66,7 +63,7 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
     let usedModel = '';
     let lastErrorDetails = '';
 
-    // 1. Probar modelos candidatos forzando respuesta JSON pura
+    // Probar modelos candidatos forzando Structured Outputs
     for (const modelName of candidateModels) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
       try {
@@ -76,7 +73,9 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
           body: JSON.stringify({
             contents: [{ parts: [{ text: promptText }] }],
             generationConfig: {
-              response_mime_type: 'application/json'
+              response_mime_type: 'application/json',
+              response_schema: jsonSchema,
+              temperature: 0.1
             }
           })
         });
@@ -98,44 +97,6 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
       }
     }
 
-    // 2. Fallback de descubrimiento dinámico si fuera necesario
-    if (!rawText) {
-      try {
-        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-        const listData = await listRes.json().catch(() => ({}));
-        
-        const availableModels = listData?.models
-          ?.filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
-          ?.map((m: any) => m.name.replace('models/', '')) || [];
-
-        for (const modelName of availableModels) {
-          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-          const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: promptText }] }],
-              generationConfig: {
-                response_mime_type: 'application/json'
-              }
-            })
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) {
-              rawText = text;
-              usedModel = modelName;
-              break;
-            }
-          }
-        }
-      } catch (discoveryErr: any) {
-        console.error('Error en auto-descubrimiento:', discoveryErr);
-      }
-    }
-
     if (!rawText) {
       return NextResponse.json({
         success: false,
@@ -145,11 +106,11 @@ Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cult
 
     let spotsData: any[] = [];
     try {
-      spotsData = extractAndParseJSON(rawText);
+      spotsData = JSON.parse(rawText);
     } catch (parseErr: any) {
       return NextResponse.json({
         success: false,
-        error: `Error parseando JSON sanitizado: ${parseErr.message}`,
+        error: `Error parseando JSON estructurado: ${parseErr.message}`,
         usedModel,
         rawText,
       }, { status: 200 });
