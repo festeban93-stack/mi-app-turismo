@@ -31,8 +31,8 @@ export async function POST(request: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Lista de modelos candidate con fallback automatico
-    const candidateModels = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+    // Lista de modelos activos con fallback automatico
+    const candidateModels = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash-exp'];
     let rawText = '';
     let lastError: any = null;
 
