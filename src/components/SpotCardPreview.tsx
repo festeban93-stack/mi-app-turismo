@@ -46,14 +46,14 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
     setErrorMessage('');
 
     const R = 6371e3;
-    const ?1 = (userCoords.lat * Math.PI) / 180;
-    const ?2 = (spot.latitude * Math.PI) / 180;
-    const ?? = ((spot.latitude - userCoords.lat) * Math.PI) / 180;
-    const ?? = ((spot.longitude - userCoords.lng) * Math.PI) / 180;
+    const phi1 = (userCoords.lat * Math.PI) / 180;
+    const phi2 = (spot.latitude * Math.PI) / 180;
+    const deltaPhi = ((spot.latitude - userCoords.lat) * Math.PI) / 180;
+    const deltaLambda = ((spot.longitude - userCoords.lng) * Math.PI) / 180;
 
     const a =
-      Math.sin(?? / 2) * Math.sin(?? / 2) +
-      Math.cos(?1) * Math.cos(?2) * Math.sin(?? / 2) * Math.sin(?? / 2);
+      Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+      Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distToSpotMeters = R * c;
 
@@ -98,7 +98,7 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
         <div className="flex items-center gap-2 text-slate-300">
           <span className="text-base">??</span>
           <div>
-            <span className="font-semibold text-slate-400 block text-[10px]">HORARIO DE ATENCI?N</span>
+            <span className="font-semibold text-slate-400 block text-[10px]">HORARIO DE ATENCION</span>
             <span>{spot.opening_hours || 'Lunes a Domingo: 8:00 AM - 5:00 PM'}</span>
           </div>
         </div>
@@ -114,7 +114,7 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
         <div className="flex items-center gap-2 text-slate-300 border-t border-slate-700/50 pt-2">
           <span className="text-base">??</span>
           <div>
-            <span className="font-semibold text-slate-400 block text-[10px]">DIRECCI?N Y UBICACI?N</span>
+            <span className="font-semibold text-slate-400 block text-[10px]">DIRECCION Y UBICACION</span>
             <span>{spot.address_text || 'Costa Rica'}</span>
             <span className="text-[10px] text-cyan-400 block mt-0.5 font-mono">
               a {(spot.distance_meters / 1000).toFixed(1)} km de ti
