@@ -19,6 +19,80 @@ const MapContainer = dynamicNext(() => import('@/components/MapComponent'), {
   ),
 });
 
+// Semillero de emergencia si Supabase retorna 0 registros
+const FALLBACK_SPOTS: Spot[] = [
+  {
+    id: 'f1',
+    title: 'Mirador Tiquicia',
+    description: 'Vista panorámica espectacular de todo el Valle Central. Comida típica costarricense, café chorreado y ambiente acogedor al atardecer.',
+    category: 'gastronomia',
+    rating_avg: 4.8,
+    distance_meters: 2400,
+    latitude: 9.8950,
+    longitude: -84.1350,
+    opening_hours: 'Martes a Domingo: 4:00 PM - 11:00 PM',
+    entry_fee: 'Consumo mínimo ₡5,000',
+    address_text: 'San Antonio de Escazú, San José',
+    checkins_count: 12
+  },
+  {
+    id: 'f2',
+    title: 'Parque Nacional Volcán Poás',
+    description: 'Uno de los cráteres volcánicos activos más grandes del mundo con laguna de color turquesa y senderos en bosque nuboso.',
+    category: 'naturaleza',
+    rating_avg: 4.9,
+    distance_meters: 35000,
+    latitude: 10.1980,
+    longitude: -84.2330,
+    opening_hours: 'Lunes a Domingo: 8:00 AM - 3:30 PM (Reserva SINAC)',
+    entry_fee: 'Nacionales: ₡1,130 | Extranjeros: $15',
+    address_text: 'Poás, Alajuela',
+    checkins_count: 45
+  },
+  {
+    id: 'f3',
+    title: 'Catarata La Paz Waterfall Gardens',
+    description: 'Impresionantes caídas de agua, santuario de vida silvestre, mariposario y senderos rodeados de densa vegetación tropical.',
+    category: 'naturaleza',
+    rating_avg: 4.7,
+    distance_meters: 32000,
+    latitude: 10.2080,
+    longitude: -84.1620,
+    opening_hours: 'Lunes a Domingo: 8:00 AM - 5:00 PM',
+    entry_fee: 'Nacionales: ₡18,000 | Extranjeros: $52',
+    address_text: 'Vara Blanca, Heredia',
+    checkins_count: 28
+  },
+  {
+    id: 'f4',
+    title: 'Baqueano Gastronómico & Café',
+    description: 'Rincón oculto especializado en cafés de especialidad de Tarrazú, repostería artesanal y desayunos típicos con ingredientes locales.',
+    category: 'gastronomia',
+    rating_avg: 4.8,
+    distance_meters: 5000,
+    latitude: 9.9281,
+    longitude: -84.0907,
+    opening_hours: 'Lunes a Sábado: 7:00 AM - 8:00 PM',
+    entry_fee: 'Entrada Libre (Café desde ₡1,800)',
+    address_text: 'Barrio Escalante, San José',
+    checkins_count: 19
+  },
+  {
+    id: 'f5',
+    title: 'Catarata Río Celeste',
+    description: 'Famosa por sus aguas de color azul turquesa intenso rodeadas por el bosque tropical del Parque Nacional Volcán Tenorio.',
+    category: 'aventura',
+    rating_avg: 4.9,
+    distance_meters: 120000,
+    latitude: 10.7010,
+    longitude: -85.0180,
+    opening_hours: 'Lunes a Domingo: 8:00 AM - 2:00 PM',
+    entry_fee: 'Nacionales: ₡904 | Extranjeros: $12',
+    address_text: 'Guatuso, Alajuela',
+    checkins_count: 67
+  }
+];
+
 export default function HomePage() {
   const [spots, setSpots] = useState<Spot[]>([]);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
@@ -56,14 +130,21 @@ export default function HomePage() {
 
       if (!error && data && data.length > 0) {
         setSpots(data as Spot[]);
-        if (!selectedSpot) {
-          setSelectedSpot(data[0]);
-        }
-      } else if (error) {
-        console.error('Error Supabase RPC:', error.message);
+        if (!selectedSpot) setSelectedSpot(data[0]);
+      } else {
+        // Fallback activo si Supabase devuelve 0 o error
+        const filteredFallback = categoryFilter && categoryFilter !== 'todas'
+          ? FALLBACK_SPOTS.filter(s => s.category === categoryFilter)
+          : FALLBACK_SPOTS;
+        setSpots(filteredFallback);
+        if (filteredFallback.length > 0 && !selectedSpot) setSelectedSpot(filteredFallback[0]);
       }
     } catch (err) {
-      console.error('Error cargando spots:', err);
+      const filteredFallback = categoryFilter && categoryFilter !== 'todas'
+        ? FALLBACK_SPOTS.filter(s => s.category === categoryFilter)
+        : FALLBACK_SPOTS;
+      setSpots(filteredFallback);
+      if (filteredFallback.length > 0 && !selectedSpot) setSelectedSpot(filteredFallback[0]);
     } finally {
       setLoading(false);
     }

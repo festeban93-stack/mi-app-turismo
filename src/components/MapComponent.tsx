@@ -6,7 +6,6 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Spot } from './SpotCardPreview';
 
-// Generador de pines personalizados HTML/Tailwind por categoria
 const createCustomIcon = (category: string) => {
   const categoryEmojis: Record<string, string> = {
     gastronomia: '🍲',
@@ -20,7 +19,7 @@ const createCustomIcon = (category: string) => {
 
   return L.divIcon({
     className: 'custom-map-pin',
-    html: `<div class="relative flex items-center justify-center w-10 h-10 bg-slate-900 text-white rounded-full border-2 border-cyan-400 shadow-lg shadow-cyan-500/40 hover:scale-125 transition-transform cursor-pointer text-base">
+    html: `<div class="relative flex items-center justify-center w-10 h-10 bg-slate-900 text-white rounded-full border-2 border-cyan-400 shadow-lg shadow-cyan-500/50 hover:scale-125 transition-transform cursor-pointer text-lg">
       <span>${emoji}</span>
       <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-cyan-400 rotate-45"></span>
     </div>`,
@@ -60,7 +59,7 @@ export default function MapComponent({
   return (
     <MapContainer
       center={defaultCenter}
-      zoom={10}
+      zoom={9}
       scrollWheelZoom={true}
       className="w-full h-full z-0"
     >
