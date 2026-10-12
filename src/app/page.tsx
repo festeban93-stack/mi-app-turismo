@@ -19,7 +19,6 @@ const MapContainer = dynamicNext(() => import('@/components/MapComponent'), {
   ),
 });
 
-// Semillero de emergencia si Supabase retorna 0 registros
 const FALLBACK_SPOTS: Spot[] = [
   {
     id: 'f1',
@@ -98,6 +97,7 @@ export default function HomePage() {
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [dataSourceInfo, setDataSourceInfo] = useState<string>('Cargando...');
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number }>({
     lat: 9.9281,
     lng: -84.0907,
@@ -130,13 +130,15 @@ export default function HomePage() {
 
       if (!error && data && data.length > 0) {
         setSpots(data as Spot[]);
+        setDataSourceInfo(`Supabase Live DB (${data.length})`);
         if (!selectedSpot) setSelectedSpot(data[0]);
       } else {
-        // Fallback activo si Supabase devuelve 0 o error
+        // Combinar o usar fallback si Supabase retorna vacio
         const filteredFallback = categoryFilter && categoryFilter !== 'todas'
           ? FALLBACK_SPOTS.filter(s => s.category === categoryFilter)
           : FALLBACK_SPOTS;
         setSpots(filteredFallback);
+        setDataSourceInfo(`Modo Offline / Seed (${filteredFallback.length})`);
         if (filteredFallback.length > 0 && !selectedSpot) setSelectedSpot(filteredFallback[0]);
       }
     } catch (err) {
@@ -144,6 +146,7 @@ export default function HomePage() {
         ? FALLBACK_SPOTS.filter(s => s.category === categoryFilter)
         : FALLBACK_SPOTS;
       setSpots(filteredFallback);
+      setDataSourceInfo(`Modo Resiliente (${filteredFallback.length})`);
       if (filteredFallback.length > 0 && !selectedSpot) setSelectedSpot(filteredFallback[0]);
     } finally {
       setLoading(false);
@@ -164,8 +167,8 @@ export default function HomePage() {
               <h1 className="text-sm font-black bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent leading-none">
                 MapAI Costa Rica
               </h1>
-              <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {spots.length} Gemas
+              <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                {dataSourceInfo}
               </span>
             </div>
             <p className="text-[10px] text-slate-400 font-medium">Exploración e Itinerarios con IA</p>
