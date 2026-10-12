@@ -1,12 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from '@/lib/supabaseClient';
 
 export interface Spot {
   id: string;
@@ -58,7 +53,7 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
     const distToSpotMeters = R * c;
 
     if (distToSpotMeters > 500) {
-      setErrorMessage(`Est?s demasiado lejos (${(distToSpotMeters / 1000).toFixed(1)} km). Debes estar a menos de 500m del lugar.`);
+      setErrorMessage(`Estas demasiado lejos (${(distToSpotMeters / 1000).toFixed(1)} km). Debes estar a menos de 500m del lugar.`);
       setCheckinStatus('error');
       return;
     }
@@ -141,7 +136,7 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
 
         {checkinStatus === 'success' ? (
           <div className="bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs p-2.5 rounded-xl text-center font-semibold">
-            ?Check-in registrado con ?xito! ?? +50 Puntos de Explorador.
+            ?Check-in registrado con exito! ?? +50 Puntos de Explorador.
           </div>
         ) : (
           <button
@@ -154,7 +149,7 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
             ) : (
               <>
                 <span>??</span>
-                <span>Hacer Check-in Aqu? (Verificar Presencia)</span>
+                <span>Hacer Check-in Aqui (Verificar Presencia)</span>
               </>
             )}
           </button>
