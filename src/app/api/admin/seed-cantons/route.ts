@@ -1,7 +1,7 @@
 ﻿import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Extractor de respaldo para JSON en caso de modelos sin soporte de schema estricto
+// Extractor de respaldo para JSON estricto
 function extractJSON(text: string) {
   let cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
   const start = cleaned.indexOf('[');
@@ -50,7 +50,8 @@ export async function POST(request: Request) {
       }, { status: 200 });
     }
 
-    const availableModels = listData?.models
+    // Filtrar modelos que soporten generateContent
+    let availableModels = listData?.models
       ?.filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
       ?.map((m: any) => m.name.replace('models/', '')) || [];
 
@@ -61,8 +62,12 @@ export async function POST(request: Request) {
       }, { status: 200 });
     }
 
-    // Priorizar modelos flash o tomar el primero disponible
-    const selectedModel = availableModels.find((m: string) => m.includes('flash')) || availableModels[0];
+    // Priorizar modelos modernos en la ordenación
+    availableModels.sort((a: string, b: string) => {
+      if (a.includes('flash') && !b.includes('flash')) return -1;
+      if (!a.includes('flash') && b.includes('flash')) return 1;
+      return 0;
+    });
 
     const promptText = `Genera exactamente 5 puntos de interés, miradores, restaurantes tradicionales o cataratas reales en la zona o cantón de: "${canton}", Costa Rica.`;
 
@@ -87,52 +92,65 @@ export async function POST(request: Request) {
       }
     };
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+    let rawText = '';
+    let usedModel = '';
+    let lastErrorDetails = '';
 
-    // Intento 1: Llamada con Structured Outputs
-    let res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }],
-        generationConfig: {
-          response_mime_type: 'application/json',
-          response_schema: jsonSchema,
-          temperature: 0.2
+    // 2. Bucle Retry en Cascada sobre TODOS los modelos descubiertos
+    for (const modelName of availableModels) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+      try {
+        // Intento con Structured Outputs
+        let res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: {
+              response_mime_type: 'application/json',
+              response_schema: jsonSchema,
+              temperature: 0.2
+            }
+          })
+        });
+
+        // Fallback sin schema en caso de inconsistencia de la API
+        if (!res.ok) {
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptText + " Devuelve únicamente un arreglo JSON." }] }],
+              generationConfig: {
+                response_mime_type: 'application/json',
+                temperature: 0.2
+              }
+            })
+          });
         }
-      })
-    });
 
-    // Intento 2: Fallback sin schema si el modelo seleccionado no soporta response_schema
-    if (!res.ok) {
-      res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText + " Devuelve únicamente un JSON array estructurado." }] }],
-          generationConfig: {
-            response_mime_type: 'application/json',
-            temperature: 0.2
+        if (res.ok) {
+          const data = await res.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            rawText = text;
+            usedModel = modelName;
+            break; // ¡Modelo exitoso encontrado!
           }
-        })
-      });
+        } else {
+          const errJson = await res.json().catch(() => ({}));
+          lastErrorDetails = `[${modelName}] Status ${res.status}: ${JSON.stringify(errJson)}`;
+        }
+      } catch (err: any) {
+        lastErrorDetails = `[${modelName}] Error conexión: ${err?.message}`;
+      }
     }
-
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      return NextResponse.json({
-        success: false,
-        error: `Fallo HTTP en modelo [${selectedModel}]: ${JSON.stringify(errJson)}`,
-      }, { status: 200 });
-    }
-
-    const data = await res.json();
-    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     if (!rawText) {
       return NextResponse.json({
         success: false,
-        error: `El modelo [${selectedModel}] devolvió una respuesta vacía.`,
+        error: `Ningún modelo respondio con éxito. Modelos probados: [${availableModels.join(', ')}]. Último error: ${lastErrorDetails}`,
       }, { status: 200 });
     }
 
@@ -142,7 +160,7 @@ export async function POST(request: Request) {
     } catch (parseErr: any) {
       return NextResponse.json({
         success: false,
-        error: `Error parseando JSON (${parseErr.message}) en modelo [${selectedModel}].`,
+        error: `Error parseando JSON (${parseErr.message}) en modelo [${usedModel}].`,
         rawText,
       }, { status: 200 });
     }
@@ -176,7 +194,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       canton_processed: canton,
-      model_used: selectedModel,
+      model_used: usedModel,
       inserted_count: insertedData?.length || 0,
     }, { status: 200 });
 
