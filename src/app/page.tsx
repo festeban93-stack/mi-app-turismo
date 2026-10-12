@@ -26,7 +26,7 @@ export default function HomePage() {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number }>({
     lat: 9.9281,
-    lng: -84.0907, // Coordenadas por defecto: San José / Valle Central
+    lng: -84.0907,
   });
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export default function HomePage() {
             lng: pos.coords.longitude,
           });
         },
-        (err) => console.log('Uso de coordenadas por defecto San José:', err)
+        (err) => console.log('Coordenadas por defecto San José:', err)
       );
     }
   }, []);
@@ -50,7 +50,7 @@ export default function HomePage() {
       const { data, error } = await supabase.rpc('get_spots_nearby', {
         lat: userCoords.lat,
         lng: userCoords.lng,
-        radius_meters: 500000, // 500 km (cubre todo el país)
+        radius_meters: 500000,
         cat_filter: categoryFilter === 'todas' ? null : categoryFilter,
       });
 
@@ -79,9 +79,14 @@ export default function HomePage() {
         <div className="flex items-center gap-2.5">
           <span className="text-2xl">🇨🇷</span>
           <div>
-            <h1 className="text-sm font-black bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent leading-none">
-              MapAI Costa Rica
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-black bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent leading-none">
+                MapAI Costa Rica
+              </h1>
+              <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {spots.length} Gemas
+              </span>
+            </div>
             <p className="text-[10px] text-slate-400 font-medium">Exploración e Itinerarios con IA</p>
           </div>
         </div>
