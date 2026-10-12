@@ -24,7 +24,10 @@ export default function HomePage() {
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number }>({
+    lat: 9.9281,
+    lng: -84.0907, // Coordenadas por defecto: San José / Valle Central
+  });
 
   useEffect(() => {
     if (typeof window !== 'undefined' && navigator.geolocation) {
@@ -35,32 +38,29 @@ export default function HomePage() {
             lng: pos.coords.longitude,
           });
         },
-        () => {
-          setUserCoords({ lat: 9.9281, lng: -84.0907 });
-        }
+        (err) => console.log('Uso de coordenadas por defecto San José:', err)
       );
-    } else {
-      setUserCoords({ lat: 9.9281, lng: -84.0907 });
     }
   }, []);
 
   const loadNearbySpots = async () => {
-    if (!userCoords) return;
     setLoading(true);
 
     try {
       const { data, error } = await supabase.rpc('get_spots_nearby', {
         lat: userCoords.lat,
         lng: userCoords.lng,
-        radius_meters: 60000,
+        radius_meters: 500000, // 500 km (cubre todo el país)
         cat_filter: categoryFilter === 'todas' ? null : categoryFilter,
       });
 
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         setSpots(data as Spot[]);
-        if (data.length > 0 && !selectedSpot) {
+        if (!selectedSpot) {
           setSelectedSpot(data[0]);
         }
+      } else if (error) {
+        console.error('Error Supabase RPC:', error.message);
       }
     } catch (err) {
       console.error('Error cargando spots:', err);
@@ -70,9 +70,7 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    if (userCoords) {
-      loadNearbySpots();
-    }
+    loadNearbySpots();
   }, [userCoords, categoryFilter]);
 
   return (
