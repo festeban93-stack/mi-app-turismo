@@ -2,26 +2,29 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { supabase } from '@/lib/supabaseClient';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
 export async function POST(request: Request) {
   try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { success: false, error: 'GEMINI_API_KEY no definida en Vercel.' },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     const canton = body.canton || 'La Fortuna, San Carlos';
 
-    if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ error: 'GEMINI_API_KEY no configurada en Vercel' }, { status: 500 });
-    }
-
+    const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    const prompt = `Actúa como guía turístico experto en Costa Rica. Genera exactamente 6 puntos de interés, miradores, restaurantes locales o gemas ocultas en la zona de: "${canton}".
+    const prompt = `Actúa como un mapa turístico de Costa Rica. Genera exactamente 6 puntos de interés, miradores, restaurantes tradicionales, cataratas o gemas ocultas en la zona de: "${canton}".
 
-Devuelve ÚNICAMENTE un arreglo JSON válido (sin markdown ```json) con el siguiente formato:
+Devuelve ÚNICAMENTE un arreglo JSON válido sin formato Markdown ni texto extra. Formato requerido:
 [
   {
     "title": "Nombre del lugar",
-    "description": "Descripción de 2 frases enfocada en el atractivo.",
+    "description": "Descripción atractiva de 2 frases enfocada en la experiencia.",
     "category": "gastronomia",
     "latitude": 10.4678,
     "longitude": -84.6427,
@@ -30,21 +33,33 @@ Devuelve ÚNICAMENTE un arreglo JSON válido (sin markdown ```json) con el sigui
     "entry_fee": "Entrada Gratuita"
   }
 ]
-Nota para category: usa solo uno de estos valores: "gastronomia", "naturaleza", "aventura", "cultura", "hospedaje".`;
+Valores permitidos para category: "gastronomia", "naturaleza", "aventura", "cultura", "hospedaje".`;
 
     const response = await model.generateContent(prompt);
     const rawText = response.response.text();
-    const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-    const spotsData = JSON.parse(cleanText);
+    
+    // Extracción limpia mediante Regex para evitar fallos de Markdown
+    const jsonMatch = rawText.match(/\[\s*\{[\s\S]*\}\s*\]/);
+    if (!jsonMatch) {
+      return NextResponse.json(
+        { success: false, error: 'La respuesta de la IA no contenía un JSON válido.', rawText },
+        { status: 500 }
+      );
+    }
 
-    // Mapear datos a formato PostGIS y preparar insercion en lote
+    const spotsData = JSON.parse(jsonMatch[0]);
+
+    // Formato GeoJSON compatible con PostGIS/PostgREST en Supabase
     const rowsToInsert = spotsData.map((spot: any) => ({
       title: spot.title,
       description: spot.description,
       category: ['gastronomia', 'naturaleza', 'aventura', 'cultura', 'hospedaje'].includes(spot.category) 
         ? spot.category 
         : 'naturaleza',
-      location: `POINT(${spot.longitude} ${spot.latitude})`,
+      location: {
+        type: 'Point',
+        coordinates: [Number(spot.longitude), Number(spot.latitude)],
+      },
       address_text: spot.address_text || canton,
       opening_hours: spot.opening_hours || 'Lunes a Domingo: 8:00 AM - 5:00 PM',
       entry_fee: spot.entry_fee || 'Entrada Libre',
@@ -58,7 +73,7 @@ Nota para category: usa solo uno de estos valores: "gastronomia", "naturaleza", 
       .select();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -67,6 +82,9 @@ Nota para category: usa solo uno de estos valores: "gastronomia", "naturaleza", 
       inserted_count: data?.length || 0,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error.message || 'Error interno del servidor' },
+      { status: 500 }
+    );
   }
 }
