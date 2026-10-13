@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { 
   X, 
   MapPin, 
@@ -15,8 +16,19 @@ import {
   Waves,
   Camera,
   Image as ImageIcon,
-  Trash2
+  Trash2,
+  Map,
+  Link2
 } from 'lucide-react';
+
+const MapPickerWithNoSSR = dynamic(() => import('@/components/MapPicker'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-48 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center text-slate-500 text-xs animate-pulse">
+      Cargando mapa selector...
+    </div>
+  ),
+});
 
 interface AddSpotModalProps {
   isOpen: boolean;
@@ -31,31 +43,34 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
   const [addressText, setAddressText] = useState('');
   const [nickname, setNickname] = useState('');
 
+  // Modo de Ubicación: 'gps' | 'manual'
+  const [locationMode, setLocationMode] = useState<'gps' | 'manual'>('gps');
+  const [rawLocationInput, setRawLocationInput] = useState('');
+
+  // Coordenadas
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
   // Estados de Imagen
   const [imageUrl, setImageUrl] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  // Referencias a inputs de archivos ocultos
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-
-  // Estados de GPS
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
-  const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rewardData, setRewardData] = useState<any | null>(null);
 
   useEffect(() => {
     if (isOpen) {
-      fetchGPSLocation();
+      if (locationMode === 'gps') fetchGPSLocation();
     } else {
       resetForm();
     }
-  }, [isOpen]);
+  }, [isOpen, locationMode]);
 
   const fetchGPSLocation = () => {
     if (!navigator.geolocation) {
@@ -74,19 +89,50 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
       },
       (error) => {
         setIsGettingLocation(false);
-        setLocationError('No se pudo obtener la ubicación GPS exacta.');
-        setLatitude(9.9281);
-        setLongitude(-84.0907);
+        setLocationError('No se pudo obtener el GPS automáticamente. Podés seleccionar en el mapa.');
+        if (!latitude) {
+          setLatitude(9.9281);
+          setLongitude(-84.0907);
+        }
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
+  };
+
+  // Parser para Links de Google Maps o Coordenadas "9.9321, -84.0812"
+  const handleParseLocationInput = (inputVal: string) => {
+    setRawLocationInput(inputVal);
+    if (!inputVal.trim()) return;
+
+    // Detectar patrón @lat,lng en URLs de Google Maps
+    const gmapsMatch = inputVal.match(/@([-\d.]+),([-\d.]+)/);
+    if (gmapsMatch) {
+      const parsedLat = parseFloat(gmapsMatch[1]);
+      const parsedLng = parseFloat(gmapsMatch[2]);
+      if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+        setLatitude(parsedLat);
+        setLongitude(parsedLng);
+        return;
+      }
+    }
+
+    // Detectar patrón "lat, lng" o "lat lng"
+    const coordsMatch = inputVal.match(/([-\d.]+)[,\s]+([-\d.]+)/);
+    if (coordsMatch) {
+      const parsedLat = parseFloat(coordsMatch[1]);
+      const parsedLng = parseFloat(coordsMatch[2]);
+      if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+        setLatitude(parsedLat);
+        setLongitude(parsedLng);
+        return;
+      }
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Mostrar vista previa local instantánea
     const localPreviewUrl = URL.createObjectURL(file);
     setImagePreview(localPreviewUrl);
     setIsUploadingImage(true);
@@ -126,6 +172,8 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
     setImagePreview(null);
     setLatitude(null);
     setLongitude(null);
+    setLocationMode('gps');
+    setRawLocationInput('');
     setRewardData(null);
     setIsSubmitting(false);
   };
@@ -172,8 +220,6 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
       
-      {/* Inputs de Archivo Ocultos */}
-      {/* 1. Abrir Cámara directamente */}
       <input
         type="file"
         ref={cameraInputRef}
@@ -182,7 +228,6 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
         onChange={handleFileChange}
         className="hidden"
       />
-      {/* 2. Abrir Galería de Fotos */}
       <input
         type="file"
         ref={galleryInputRef}
@@ -201,7 +246,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
             </div>
             <div>
               <h3 className="text-base font-bold text-white leading-tight">Reportar Gema Oculta</h3>
-              <p className="text-[11px] text-slate-400">Verificación con fotografía real</p>
+              <p className="text-[11px] text-slate-400">Verificación con evidencia fotográfica</p>
             </div>
           </div>
           <button
@@ -216,7 +261,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
         <div className="p-5 overflow-y-auto space-y-4 custom-scrollbar">
           
           {rewardData ? (
-            /* Pantalla de Éxito / Gamificación */
+            /* Pantalla de Éxito */
             <div className="py-6 text-center space-y-4 animate-scale-up">
               <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg">
                 <CheckCircle2 className="w-10 h-10 animate-bounce" />
@@ -225,7 +270,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
               <div className="space-y-1">
                 <h4 className="text-xl font-black text-white">¡Gema Enviada a Verificación!</h4>
                 <p className="text-xs text-slate-300">
-                  Gracias <span className="font-bold text-cyan-400">{rewardData.spot?.explorer_nickname}</span>. La foto de evidencia está en revisión por el equipo de curadores.
+                  Gracias <span className="font-bold text-cyan-400">{rewardData.spot?.explorer_nickname}</span>. Tu foto e información están en revisión.
                 </p>
               </div>
 
@@ -247,40 +292,128 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
             /* Formulario */
             <form onSubmit={handleSubmit} className="space-y-4">
               
-              {/* GPS Indicator */}
-              <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 text-xs">
-                  <MapPin className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                  <div>
-                    <span className="font-semibold text-slate-200">Ubicación GPS:</span>
-                    <p className="text-[10px] text-slate-400">
-                      {isGettingLocation ? (
-                        <span className="inline-flex items-center gap-1 text-cyan-400">
-                          <Loader2 className="w-3 h-3 animate-spin" /> Detección GPS activa...
-                        </span>
-                      ) : latitude && longitude ? (
-                        <span className="text-emerald-400 font-mono">
-                          {latitude.toFixed(4)}, {longitude.toFixed(4)}
-                        </span>
-                      ) : (
-                        <span className="text-amber-400">Sin GPS</span>
-                      )}
-                    </p>
-                  </div>
+              {/* MODALIDAD DE UBICACIÓN (GPS VS MANUAL/MAPA) */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-300">Ubicación del Lugar *</label>
+                
+                {/* Selector de Pestañas */}
+                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setLocationMode('gps')}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      locationMode === 'gps'
+                        ? 'bg-cyan-500 text-slate-950 shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Navigation className="w-3.5 h-3.5" />
+                    <span>GPS Automático</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLocationMode('manual')}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      locationMode === 'manual'
+                        ? 'bg-cyan-500 text-slate-950 shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Map className="w-3.5 h-3.5" />
+                    <span>Elegir en Mapa</span>
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={fetchGPSLocation}
-                  disabled={isGettingLocation}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-slate-300 flex items-center gap-1 transition-colors flex-shrink-0"
-                >
-                  <Navigation className="w-3 h-3 text-cyan-400" />
-                  <span>Recapturar</span>
-                </button>
+                {/* Contenido según el Modo */}
+                {locationMode === 'gps' ? (
+                  <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 text-xs">
+                      <MapPin className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      <div>
+                        <span className="font-semibold text-slate-200">Coordenadas GPS:</span>
+                        <p className="text-[10px] text-slate-400">
+                          {isGettingLocation ? (
+                            <span className="inline-flex items-center gap-1 text-cyan-400">
+                              <Loader2 className="w-3 h-3 animate-spin" /> Capturando GPS...
+                            </span>
+                          ) : latitude && longitude ? (
+                            <span className="text-emerald-400 font-mono">
+                              {latitude.toFixed(4)}, {longitude.toFixed(4)}
+                            </span>
+                          ) : (
+                            <span className="text-amber-400">Sin GPS</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={fetchGPSLocation}
+                      disabled={isGettingLocation}
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-slate-300 flex items-center gap-1 transition-colors flex-shrink-0"
+                    >
+                      <Navigation className="w-3 h-3 text-cyan-400" />
+                      <span>Recapturar</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 p-3 rounded-2xl bg-slate-950/60 border border-slate-800">
+                    
+                    {/* Pegar Enlace o Coordenadas */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-slate-400 flex items-center gap-1">
+                        <Link2 className="w-3 h-3 text-cyan-400" />
+                        <span>Pegá link de Google Maps o coordenadas "lat, lng":</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej: https://maps.app.goo.gl/... o 9.9321, -84.0812"
+                        value={rawLocationInput}
+                        onChange={(e) => handleParseLocationInput(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500"
+                      />
+                    </div>
+
+                    {/* Mini Mapa Picker */}
+                    <MapPickerWithNoSSR
+                      lat={latitude || 9.7489}
+                      lng={longitude || -83.7534}
+                      onChange={(newLat, newLng) => {
+                        setLatitude(newLat);
+                        setLongitude(newLng);
+                      }}
+                    />
+
+                    {/* Indicadores Numéricos */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400">Latitud:</span>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={latitude || ''}
+                          onChange={(e) => setLatitude(parseFloat(e.target.value))}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-emerald-400"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400">Longitud:</span>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={longitude || ''}
+                          onChange={(e) => setLongitude(parseFloat(e.target.value))}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-emerald-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* MÓDULO DE FOTOGRAFÍA: CÁMARA O GALERÍA */}
+              {/* FOTOGRAFÍA: CÁMARA O GALERÍA */}
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
                   <span>Foto del Lugar (Evidencia) *</span>
@@ -288,8 +421,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                 </label>
 
                 {imagePreview ? (
-                  /* Vista Previa de la Foto */
-                  <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-slate-700 group bg-slate-950">
+                  <div className="relative w-full h-36 rounded-2xl overflow-hidden border border-slate-700 bg-slate-950">
                     <img
                       src={imagePreview}
                       alt="Vista previa"
@@ -308,35 +440,29 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                           setImagePreview(null);
                           setImageUrl('');
                         }}
-                        className="absolute top-3 right-3 p-2 rounded-full bg-slate-950/80 text-rose-400 hover:text-rose-300 border border-slate-800 backdrop-blur-md transition-all shadow-lg"
-                        title="Eliminar foto"
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-950/80 text-rose-400 hover:text-rose-300 border border-slate-800 backdrop-blur-md transition-all shadow-lg"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                   </div>
                 ) : (
-                  /* Botones para seleccionar Cámara o Galería */
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={() => cameraInputRef.current?.click()}
-                      className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 hover:bg-slate-800/60 hover:border-cyan-500/50 text-slate-300 hover:text-white transition-all group"
+                      className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 hover:bg-slate-800/60 hover:border-cyan-500/50 text-slate-300 hover:text-white transition-all group"
                     >
-                      <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform">
-                        <Camera className="w-5 h-5" />
-                      </div>
+                      <Camera className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
                       <span className="text-xs font-semibold">Tomar Foto (Cámara)</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => galleryInputRef.current?.click()}
-                      className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 hover:bg-slate-800/60 hover:border-emerald-500/50 text-slate-300 hover:text-white transition-all group"
+                      className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 hover:bg-slate-800/60 hover:border-emerald-500/50 text-slate-300 hover:text-white transition-all group"
                     >
-                      <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
-                        <ImageIcon className="w-5 h-5" />
-                      </div>
+                      <ImageIcon className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
                       <span className="text-xs font-semibold">Elegir de Galería</span>
                     </button>
                   </div>
@@ -352,11 +478,11 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                   placeholder="Ej: Mirador Valle del Sol, Soda Doña Rosa..."
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:outline-none text-xs text-white"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:outline-none text-xs text-white"
                 />
               </div>
 
-              {/* Categorías Selector */}
+              {/* Categorías */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-300">Categoría</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -414,20 +540,20 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
               <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-950/50 to-cyan-950/50 border border-emerald-500/30 flex items-center gap-2.5">
                 <Sparkles className="w-5 h-5 text-emerald-400 flex-shrink-0 animate-bounce" />
                 <p className="text-[11px] text-slate-300 leading-snug">
-                  Ganarás <strong className="text-emerald-400">+50 Pts</strong> y la insignia <strong className="text-cyan-400">Pionero Local</strong> cuando la foto sea verificada.
+                  Ganarás <strong className="text-emerald-400">+50 Pts</strong> y la insignia <strong className="text-cyan-400">Pionero Local</strong> tras ser verificada.
                 </p>
               </div>
 
               {/* Botón de Envío */}
               <button
                 type="submit"
-                disabled={isSubmitting || isUploadingImage || !title || !imageUrl}
+                disabled={isSubmitting || isUploadingImage || !title || !imageUrl || !latitude || !longitude}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold text-xs shadow-lg hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Enviando para moderación...</span>
+                    <span>Enviando a moderación...</span>
                   </>
                 ) : (
                   <span>🔒 Enviar a Verificación (+50 Pts)</span>
