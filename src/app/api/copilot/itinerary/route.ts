@@ -89,7 +89,6 @@ export async function POST(request: Request) {
       const titleNorm = normalizeText(spot.title);
       const descNorm = normalizeText(spot.description);
       const addrNorm = normalizeText(spot.address_text);
-      const catNorm = normalizeText(spot.category);
 
       if (matchedRegionKeywords.length > 0) {
         for (const kw of matchedRegionKeywords) {
