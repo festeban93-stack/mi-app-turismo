@@ -21,10 +21,8 @@ export default function HomePage() {
   useEffect(() => {
     async function fetchSpots() {
       try {
-        // Deshabilitar cache del navegador agregando timestamp dinamico
         const res = await fetch(`/api/spots?t=${Date.now()}`, {
           cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' }
         });
         const json = await res.json();
         
@@ -32,27 +30,7 @@ export default function HomePage() {
           ? json 
           : (json.spots || json.data || []);
 
-        // Sanitización y parseo estricto de coordenadas PostGIS POINT(lng lat)
-        const cleanSpots = rawSpots.map((s: any) => {
-          let lat = s.latitude;
-          let lng = s.longitude;
-
-          if ((!lat || !lng || isNaN(Number(lat))) && s.location) {
-            const match = String(s.location).match(/POINT\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
-            if (match) {
-              lng = parseFloat(match[1]);
-              lat = parseFloat(match[2]);
-            }
-          }
-
-          return {
-            ...s,
-            latitude: typeof lat === 'number' ? lat : parseFloat(lat),
-            longitude: typeof lng === 'number' ? lng : parseFloat(lng),
-          };
-        }).filter((s: any) => !isNaN(s.latitude) && !isNaN(s.longitude));
-
-        setSpots(cleanSpots);
+        setSpots(rawSpots);
       } catch (err) {
         console.error('Error cargando spots:', err);
       }
@@ -76,7 +54,7 @@ export default function HomePage() {
         />
       </div>
 
-      {/* 2. HEADER FLOTANTE RESPONSIVO (Top Bar) */}
+      {/* 2. HEADER FLOTANTE RESPONSIVO */}
       <div className="absolute top-3 left-3 right-3 md:right-auto z-20 flex items-center justify-between md:justify-start gap-2 pointer-events-auto">
         <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-xl px-3 py-2 text-white shadow-xl flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-950 font-black flex items-center justify-center text-xs shadow-md">
@@ -93,7 +71,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Categorías deslizables */}
+        {/* Categorías */}
         <div className="flex items-center gap-1 bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1 rounded-xl shadow-xl overflow-x-auto max-w-[200px] sm:max-w-none custom-scrollbar">
           {['Todas', 'gastronomia', 'naturaleza', 'aventura', 'cultura'].map((cat) => (
             <button
@@ -148,7 +126,7 @@ export default function HomePage() {
             </button>
           </div>
         ) : (
-          /* Hub de Descubrimiento cuando no hay nada seleccionado */
+          /* Hub de Descubrimiento */
           <div className="w-full max-h-[60vh] md:max-h-[calc(100vh-5.5rem)] overflow-y-auto rounded-t-3xl md:rounded-2xl custom-scrollbar shadow-2xl">
             <DiscoveryHub
               totalSpotsCount={spots.length}
