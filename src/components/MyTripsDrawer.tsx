@@ -12,7 +12,8 @@ import {
   Trash2, 
   CheckCircle2, 
   Compass,
-  Users
+  Bot,
+  UserCheck
 } from 'lucide-react';
 
 interface MyTripsDrawerProps {
@@ -107,7 +108,7 @@ export default function MyTripsDrawer({
             </div>
             <div>
               <h3 className="text-sm font-extrabold">Mis Itinerarios de Viaje</h3>
-              <p className="text-[10px] text-slate-500">Gestión sin salir de la plataforma</p>
+              <p className="text-[10px] text-slate-500">Manuales e Inteligencia Artificial</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400">
@@ -121,7 +122,7 @@ export default function MyTripsDrawer({
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tus Viajes Guardados</label>
               {trips.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">Aún no has creado itinerarios personalizados.</p>
+                <p className="text-xs text-slate-400 py-4 text-center">Aún no tenés viajes guardados.</p>
               ) : (
                 trips.map(t => (
                   <div
@@ -130,7 +131,18 @@ export default function MyTripsDrawer({
                     className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-500 cursor-pointer transition-all flex items-center justify-between"
                   >
                     <div>
-                      <h4 className="font-extrabold text-xs text-slate-900 dark:text-white">{t.title}</h4>
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="font-extrabold text-xs text-slate-900 dark:text-white">{t.title}</h4>
+                        {t.is_ai_generated ? (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[8px] font-bold border border-emerald-500/20 flex items-center gap-0.5">
+                            <Bot className="w-2.5 h-2.5" /> IA
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[8px] font-bold">
+                            Manual
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-500">{t.duration_days} Días de Exploración</p>
                     </div>
                     <Route className="w-4 h-4 text-emerald-600" />
@@ -148,8 +160,15 @@ export default function MyTripsDrawer({
               </button>
 
               <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-1">
-                <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">{selectedTrip.title}</h4>
-                <div className="flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300 font-bold">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">{selectedTrip.title}</h4>
+                  {selectedTrip.is_ai_generated && (
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-600 text-white font-extrabold text-[9px] flex items-center gap-1">
+                      <Bot className="w-3 h-3" /> Creado con IA
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300 font-bold pt-1">
                   <span>{selectedTrip.duration_days} Días de Viaje</span>
                   <span>Presupuesto Est: ${totalCost.toLocaleString()}</span>
                 </div>
@@ -200,7 +219,7 @@ export default function MyTripsDrawer({
       </div>
 
       <div className="p-3 text-center text-[10px] text-slate-400 border-t border-slate-200 dark:border-slate-800">
-        MapAI Trip Manager • Sincronizado en tiempo real
+        MapAI Trip Manager • Integración IA + Colaborativo
       </div>
 
     </div>

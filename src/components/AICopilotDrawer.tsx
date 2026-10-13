@@ -1,25 +1,32 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { 
-  Sparkles, 
   X, 
   Send, 
-  Calendar, 
-  Clock, 
-  Loader2, 
-  ChevronRight,
-  Bot,
-  FileDown,
-  Trash2
+  Bot, 
+  User, 
+  Sparkles, 
+  MapPin, 
+  Route, 
+  CheckCircle2, 
+  BookmarkPlus, 
+  Loader2 
 } from 'lucide-react';
 
 interface AICopilotDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   initialPrompt?: string;
-  onApplyRouteToMap: (routeSpots: any[]) => void;
-  onClearRoute?: () => void;
+  onApplyRouteToMap: (spotsForRoute: any[]) => void;
+  onClearRoute: () => void;
+}
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  suggestedSpots?: any[];
 }
 
 export default function AICopilotDrawer({
@@ -29,287 +36,238 @@ export default function AICopilotDrawer({
   onApplyRouteToMap,
   onClearRoute
 }: AICopilotDrawerProps) {
-  const [promptInput, setPromptInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [itineraryResult, setItineraryResult] = useState<any | null>(null);
-  const [routeSpots, setRouteSpots] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: 'assistant',
+      content: '¡Hola! Soy tu Copiloto de Inteligencia Artificial para Costa Rica. Decime qué tipo de viaje tenés en mente (ej: "Ruta de 2 días en Monteverde con miradores y café") y te armo el itinerario.'
+    }
+  ]);
+
+  const [inputPrompt, setInputPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [savingTripId, setSavingTripId] = useState<string | null>(null);
+  const [savedSuccessMsg, setSavedSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen && initialPrompt) {
-      setPromptInput(initialPrompt);
-      generateItinerary(initialPrompt);
+    if (initialPrompt && isOpen) {
+      handleSendMessage(initialPrompt);
     }
-  }, [isOpen, initialPrompt]);
+  }, [initialPrompt, isOpen]);
 
-  const generateItinerary = async (queryText: string) => {
-    if (!queryText.trim()) return;
+  if (!isOpen) return null;
 
-    setIsLoading(true);
-    setItineraryResult(null);
+  const handleSendMessage = async (textToSend?: string) => {
+    const promptText = textToSend || inputPrompt;
+    if (!promptText.trim() || loading) return;
+
+    const userMessage: Message = { role: 'user', content: promptText };
+    setMessages(prev => [...prev, userMessage]);
+    if (!textToSend) setInputPrompt('');
+    setLoading(true);
 
     try {
-      const res = await fetch('/api/copilot/itinerary', {
+      const res = await fetch('/api/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: queryText }),
+        body: JSON.stringify({ prompt: promptText })
       });
 
       const data = await res.json();
 
-      if (data.success) {
-        setItineraryResult(data.itinerary);
-        setRouteSpots(data.routeSpots || []);
-        
-        if (onApplyRouteToMap && data.routeSpots && data.routeSpots.length > 0) {
-          onApplyRouteToMap(data.routeSpots);
+      if (data?.reply) {
+        const assistantMsg: Message = {
+          role: 'assistant',
+          content: data.reply,
+          suggestedSpots: data.suggestedSpots || []
+        };
+        setMessages(prev => [...prev, assistantMsg]);
+
+        if (data.suggestedSpots && data.suggestedSpots.length > 0) {
+          onApplyRouteToMap(data.suggestedSpots);
         }
-      } else {
-        alert(`Error del Copiloto: ${data.error}`);
       }
-    } catch (err: any) {
-      alert(`Error al conectar con la IA: ${err?.message}`);
+    } catch (err) {
+      console.error('Error enviando mensaje al copiloto:', err);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Ocurrió un error al procesar tu solicitud. Por favor intenta de nuevo.'
+        }
+      ]);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleExportPDF = () => {
-    if (!itineraryResult) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+  // Guardar Ruta de IA directamente en la tabla trips de Supabase
+  const handleSaveAIRouteToMyTrips = async (spots: any[], originalPrompt: string) => {
+    if (!spots || spots.length === 0) return;
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${itineraryResult.title || 'Itinerario MapAI'}</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 30px; color: #0f172a; max-width: 800px; margin: 0 auto; line-height: 1.5; }
-            .header { border-bottom: 2px solid #059669; padding-bottom: 15px; margin-bottom: 20px; }
-            .logo { font-size: 20px; font-weight: 900; color: #059669; letter-spacing: -0.5px; }
-            h1 { font-size: 22px; margin: 10px 0 5px; color: #0f172a; }
-            .badge { display: inline-block; background: #ecfdf5; color: #047857; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; margin-right: 6px; border: 1px solid #a7f3d0; }
-            .summary { font-size: 13px; color: #475569; margin: 15px 0; background: #f8fafc; padding: 12px; border-radius: 8px; border-left: 4px solid #059669; }
-            .day-title { font-size: 15px; font-weight: 800; color: #0f172a; margin-top: 25px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
-            .activity { margin: 12px 0 12px 12px; padding-left: 12px; border-left: 2px solid #a7f3d0; }
-            .act-time { font-weight: 700; font-size: 12px; color: #059669; }
-            .act-name { font-weight: 700; font-size: 13px; color: #1e293b; margin: 2px 0; }
-            .act-desc { font-size: 12px; color: #64748b; }
-            .footer { margin-top: 40px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px; }
-            @media print { body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="logo">MapAI Costa Rica</div>
-            <h1>${itineraryResult.title}</h1>
-            <div>
-              <span class="badge">📍 ${itineraryResult.destination || 'Costa Rica'}</span>
-              <span class="badge">💰 ${itineraryResult.estimated_budget || 'Presupuesto Medio'}</span>
-            </div>
-            <div class="summary">${itineraryResult.summary}</div>
-          </div>
-          ${itineraryResult.days?.map((day: any) => `
-            <div class="day-title">🗓️ ${day.title || `Día ${day.day}`}</div>
-            ${day.activities?.map((act: any) => `
-              <div class="activity">
-                <div class="act-time">⏰ ${act.time}</div>
-                <div class="act-name">${act.activity}</div>
-                <div class="act-desc">${act.description}</div>
-              </div>
-            `).join('')}
-          `).join('')}
-          <div class="footer">Generado por MapAI Costa Rica - Descubrimiento Turístico Inteligente</div>
-        </body>
-      </html>
-    `;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      alert('Debés iniciar sesión para guardar este viaje en tu cuenta.');
+      return;
+    }
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
+    setSavingTripId(originalPrompt);
+
+    try {
+      const tripTitle = `Viaje IA: ${originalPrompt.slice(0, 30)}...`;
+
+      // 1. Crear viaje con flag is_ai_generated = true
+      const { data: tripData, error: tripError } = await supabase
+        .from('trips')
+        .insert([
+          {
+            owner_id: session.user.id,
+            title: tripTitle,
+            duration_days: Math.ceil(spots.length / 2) || 1,
+            is_ai_generated: true,
+            ai_prompt: originalPrompt
+          }
+        ])
+        .select()
+        .single();
+
+      if (tripError) throw tripError;
+
+      // 2. Asignar las gemas recomendadas
+      const spotsPayload = spots.map((spot, index) => ({
+        trip_id: tripData.id,
+        spot_id: spot.id,
+        day_number: Math.floor(index / 2) + 1,
+        order_index: index,
+        estimated_cost: parseFloat(spot.entry_fee?.match(/\d+/g)?.[0] || '0')
+      }));
+
+      const { error: spotsError } = await supabase
+        .from('trip_spots')
+        .insert(spotsPayload);
+
+      if (spotsError) throw spotsError;
+
+      setSavedSuccessMsg('¡Viaje guardado en "Mis Viajes"!');
+      setTimeout(() => setSavedSuccessMsg(null), 3000);
+    } catch (err: any) {
+      alert(`Error al guardar el viaje de IA: ${err?.message || err}`);
+    } finally {
+      setSavingTripId(null);
+    }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full md:w-[420px] bg-white/95 dark:bg-slate-950/95 backdrop-blur-2xl border-l border-slate-200/80 dark:border-slate-800/80 text-slate-900 dark:text-slate-100 shadow-2xl flex flex-col animate-slide-left">
+    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 shadow-2xl p-4 flex flex-col justify-between animate-fade-in text-slate-900 dark:text-slate-100 select-none">
       
-      {/* Header Copiloto */}
-      <div className="p-3.5 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
-            <Bot className="w-4 h-4 animate-pulse" />
+          <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <Bot className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-              <span>Copiloto IA</span>
-              <span className="text-[9px] bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-1.5 rounded-full font-bold">
-                PRO
-              </span>
+            <h3 className="text-sm font-extrabold flex items-center gap-1.5">
+              <span>Copiloto Turístico IA</span>
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             </h3>
-            <p className="text-[9px] text-slate-500 dark:text-slate-400">Itinerarios con gemas locales</p>
+            <p className="text-[10px] text-slate-500">Recomendaciones personalizadas</p>
           </div>
         </div>
-
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-        >
+        <button onClick={onClose} className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400">
           <X className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Cuerpo Principal */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-        
-        {!itineraryResult && !isLoading && (
-          <div className="space-y-3 my-auto py-6">
-            <div className="text-center space-y-1">
-              <Sparkles className="w-6 h-6 text-emerald-600 dark:text-emerald-400 mx-auto animate-bounce" />
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">¿A dónde querés viajar hoy?</h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
-                Ingresá tu destino o elegí una sugerencia.
-              </p>
-            </div>
-
-            <div className="space-y-1.5 pt-2">
-              {[
-                'Plan de fin de semana en La Fortuna',
-                'Mejores playas para atardeceres en Guanacaste',
-                'Sodas tradicionales imperdibles en Cartago',
-                'Escapada de aventura en Monteverde'
-              ].map((suggestion, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setPromptInput(suggestion);
-                    generateItinerary(suggestion);
-                  }}
-                  className="w-full text-left p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-500/50 text-[11px] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all flex items-center justify-between group"
-                >
-                  <span className="font-medium">"{suggestion}"</span>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
-                </button>
-              ))}
-            </div>
+      {/* Historial de Mensajes */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar my-3 space-y-3 pr-1">
+        {savedSuccessMsg && (
+          <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-bold text-xs text-center flex items-center justify-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>{savedSuccessMsg}</span>
           </div>
         )}
 
-        {isLoading && (
-          <div className="py-16 text-center space-y-3">
-            <Loader2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400 animate-spin mx-auto" />
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-slate-900 dark:text-white">Generando itinerario...</p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">Analizando gemas locales en Costa Rica</p>
-            </div>
-          </div>
-        )}
-
-        {itineraryResult && !isLoading && (
-          <div className="space-y-4 animate-fade-in">
-            
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/90 space-y-2 shadow-sm">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <span className="text-[9px] uppercase font-bold tracking-wider text-emerald-800 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full">
-                    {itineraryResult.destination || 'Costa Rica'}
-                  </span>
-                  <h4 className="text-sm font-extrabold text-slate-900 dark:text-white mt-1">
-                    {itineraryResult.title}
-                  </h4>
-                </div>
-                <span className="text-[10px] font-semibold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md whitespace-nowrap">
-                  {itineraryResult.estimated_budget || 'Presupuesto Medio'}
-                </span>
+        {messages.map((msg, index) => (
+          <div
+            key={index}
+            className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            {msg.role === 'assistant' && (
+              <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 text-[10px] mt-1">
+                🤖
               </div>
+            )}
 
-              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
-                {itineraryResult.summary}
-              </p>
+            <div
+              className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${
+                msg.role === 'user'
+                  ? 'bg-emerald-600 text-white rounded-br-none font-medium'
+                  : 'bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-bl-none text-slate-800 dark:text-slate-200'
+              }`}
+            >
+              <p>{msg.content}</p>
 
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <button
-                  onClick={handleExportPDF}
-                  className="py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition-all flex items-center justify-center gap-1.5 shadow-sm"
-                >
-                  <FileDown className="w-3.5 h-3.5" />
-                  <span>Exportar PDF</span>
-                </button>
+              {/* Si el mensaje tiene lugares sugeridos, mostramos CTA para guardar */}
+              {msg.suggestedSpots && msg.suggestedSpots.length > 0 && (
+                <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <Route className="w-3 h-3" />
+                      Ruta trazada ({msg.suggestedSpots.length} gemas)
+                    </span>
+                  </div>
 
-                {onClearRoute && (
                   <button
-                    onClick={() => {
-                      onClearRoute();
-                      setRouteSpots([]);
-                    }}
-                    className="py-1.5 px-2.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[10px] transition-all flex items-center justify-center gap-1.5"
+                    onClick={() => handleSaveAIRouteToMyTrips(msg.suggestedSpots!, messages[index - 1]?.content || 'Ruta IA')}
+                    disabled={savingTripId === messages[index - 1]?.content}
+                    className="w-full py-2 px-3 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-950 hover:bg-slate-800 font-bold text-[10px] shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Limpiar Ruta</span>
+                    {savingTripId === messages[index - 1]?.content ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <BookmarkPlus className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
+                    )}
+                    <span>Guardar esta Ruta en Mis Viajes</span>
                   </button>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {itineraryResult.days?.map((dayObj: any, dayIdx: number) => (
-                <div key={dayIdx} className="space-y-2">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 border-b border-slate-200/80 dark:border-slate-800/80 pb-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>{dayObj.title || `Día ${dayObj.day}`}</span>
-                  </div>
-
-                  <div className="space-y-1.5 pl-2 border-l-2 border-emerald-500/40">
-                    {dayObj.activities?.map((act: any, actIdx: number) => (
-                      <div
-                        key={actIdx}
-                        className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/60 space-y-0.5"
-                      >
-                        <div className="flex items-center justify-between text-[10px]">
-                          <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-emerald-600" />
-                            {act.time}
-                          </span>
-                          <span className="text-slate-800 dark:text-slate-200 font-semibold truncate max-w-[180px]">
-                            {act.activity}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
-                          {act.description}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
                 </div>
-              ))}
+              )}
             </div>
 
+            {msg.role === 'user' && (
+              <div className="w-6 h-6 rounded-full bg-slate-300 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center flex-shrink-0 text-[10px] mt-1 font-bold">
+                U
+              </div>
+            )}
+          </div>
+        ))}
+
+        {loading && (
+          <div className="flex items-center gap-2 text-xs text-slate-400 p-2">
+            <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+            <span>Diseñando tu itinerario ideal...</span>
           </div>
         )}
-
       </div>
 
-      {/* Input Flotante */}
-      <div className="p-2.5 border-t border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
-        <form onSubmit={(e) => { e.preventDefault(); generateItinerary(promptInput); }} className="flex items-center gap-1.5">
+      {/* Input de Mensaje */}
+      <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-1.5">
           <input
             type="text"
-            placeholder="Ajustar consulta..."
-            value={promptInput}
-            onChange={(e) => setPromptInput(e.target.value)}
-            className="flex-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 focus:outline-none text-[11px] text-slate-900 dark:text-white placeholder-slate-400"
+            placeholder="Ej: ¿Qué puedo hacer cerca de Manuel Antonio?"
+            value={inputPrompt}
+            onChange={e => setInputPrompt(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+            className="flex-1 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
           />
           <button
-            type="submit"
-            disabled={isLoading || !promptInput.trim()}
-            className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold disabled:opacity-50 transition-colors shadow-sm"
+            onClick={() => handleSendMessage()}
+            disabled={loading}
+            className="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all disabled:opacity-50"
           >
-            <Send className="w-3.5 h-3.5" />
+            <Send className="w-4 h-4" />
           </button>
-        </form>
+        </div>
       </div>
 
     </div>
