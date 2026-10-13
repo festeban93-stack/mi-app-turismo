@@ -11,10 +11,9 @@ function normalizeText(text: string = ''): string {
     .trim();
 }
 
-// Diccionario Geográfico Costarricense para expansión inteligente de regiones
 const REGION_KEYWORDS: Record<string, string[]> = {
   guanacaste: ['guanacaste', 'tamarindo', 'liberia', 'flamingo', 'conchal', 'nosara', 'samara', 'santa cruz', 'papagayo', 'herradura', 'avellanas', 'playa'],
-  fortuna: ['fortuna', 'arenal', 'san carlos', 'volcan', 'aguas termales', 'terp', 'la fortuna', 'venado'],
+  fortuna: ['fortuna', 'arenal', 'san carlos', 'volcan', 'aguas termales', 'la fortuna', 'venado'],
   cartago: ['cartago', 'orosi', 'turrialba', 'irazu', 'prusia', 'paraiso', 'guayabo'],
   sanjose: ['san jose', 'escalante', 'sabana', 'amon', 'central', 'pavas', 'santa ana', 'escazu'],
   limon: ['limon', 'puerto viejo', 'cahuita', 'manzanillo', 'cocles', 'punta uva', 'talamanca', 'caribe'],
@@ -34,18 +33,16 @@ export async function POST(request: Request) {
     const geminiApiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 
     if (!supabaseUrl || !serviceKey) {
-      return NextResponse.json({ success: false, error: 'Configuración de Supabase no disponible.' }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'Configuracion de Supabase no disponible.' }, { status: 500 });
     }
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // 1. Cargar todas las gemas de la base de datos
     const { data: allSpotsRaw } = await supabase
       .from('spots')
       .select('*')
       .order('created_at', { ascending: false });
 
-    // 2. Limpiar y parsear coordenadas
     const cleanSpots = (allSpotsRaw || []).map((spot: any) => {
       let lat = parseFloat(spot.latitude);
       let lng = parseFloat(spot.longitude);
@@ -65,7 +62,6 @@ export async function POST(request: Request) {
       };
     }).filter((s: any) => !isNaN(s.latitude) && !isNaN(s.longitude));
 
-    // 3. Analizar intenciones y región del prompt
     const promptNorm = normalizeText(prompt);
     let matchedRegionKeywords: string[] = [];
     let detectedRegionName = 'Costa Rica';
@@ -76,14 +72,13 @@ export async function POST(request: Request) {
         if (regionKey === 'guanacaste') detectedRegionName = 'Guanacaste';
         else if (regionKey === 'fortuna') detectedRegionName = 'La Fortuna & Arenal';
         else if (regionKey === 'cartago') detectedRegionName = 'Cartago';
-        else if (regionKey === 'limon') detectedRegionName = 'Caribe Sur & Limón';
-        else if (regionKey === 'sanjose') detectedRegionName = 'San José';
-        else if (regionKey === 'puntarenas') detectedRegionName = 'Pacífico Central & Sur';
+        else if (regionKey === 'limon') detectedRegionName = 'Caribe Sur & Limon';
+        else if (regionKey === 'sanjose') detectedRegionName = 'San Jose';
+        else if (regionKey === 'puntarenas') detectedRegionName = 'Pacifico Central & Sur';
         break;
       }
     }
 
-    // 4. Puntuación de relevancia por gema
     const scoredSpots = cleanSpots.map(spot => {
       let score = 0;
       const titleNorm = normalizeText(spot.title);
@@ -115,47 +110,40 @@ export async function POST(request: Request) {
       selectedSpots = selectedSpots.slice(0, 6);
     }
 
-    // 5. Consulta a Gemini API (Si existe la API Key)
     let itineraryJson: any = null;
 
     if (geminiApiKey) {
       const spotsContextText = selectedSpots
-        .map(s => `[ID: ${s.id}] Título: "${s.title}" \vert{} Categoría: ${s.category} | Ubicación: ${s.address_text \vert{}\vert{} 'Costa Rica'} \vert{} Descripción: ${s.description}`)
+        .map(s => `[ID: ${s.id}] Titulo: "${s.title}" - Categoria: ${s.category} - Ubicacion: ${s.address_text || 'Costa Rica'} - Descripcion: ${s.description}`)
         .join('\n');
 
-      const systemPrompt = `
-Eres el Copiloto Experto de Turismo e Itinerarios de "MapAI Costa Rica".
-Crea un itinerario diario detallado en JSON estricto usando ÚNICAMENTE las gemas reales de la lista.
-
-REGLAS STRICTAS:
-1. Responde SOLAMENTE un objeto JSON válido, sin delimitadores \`\`\`json ni texto libre.
-2. Cada actividad DEBE referenciar un spot real de la lista con su "spot_id" e indicar su título real en "activity".
-3. Formato JSON:
+      const systemPrompt = `Eres un asistente de viajes experto para Costa Rica. Crea un itinerario diario en JSON estricto usando SOLO estas gemas reales.
+Responde UNICAMENTE un objeto JSON sin marcas de formato ni texto adicional.
+Estructura:
 {
   "title": "Nombre del itinerario",
   "destination": "${detectedRegionName}",
-  "estimated_budget": "Económico | Presupuesto Medio | Premium",
-  "summary": "Resumen atractivo de 2 frases sobre la experiencia.",
+  "estimated_budget": "Presupuesto Medio",
+  "summary": "Resumen conciso.",
   "days": [
     {
       "day": 1,
-      "title": "Título del Día 1",
+      "title": "Dia 1",
       "activities": [
         {
           "time": "8:00 AM",
-          "activity": "Nombre real del lugar",
-          "description": "Recomendación práctica basada en la descripción real.",
-          "spot_id": "ID_EXACTO_DE_LA_LISTA"
+          "activity": "Nombre exacto del lugar",
+          "description": "Detalle de la actividad",
+          "spot_id": "ID_DEL_SPOT"
         }
       ]
     }
   ],
-  "recommended_spot_ids": ["ID_1", "ID_2", "ID_3"]
+  "recommended_spot_ids": ["ID_1", "ID_2"]
 }
 
-LISTA DE GEMAS REALES DISPONIBLES:
-${spotsContextText}
-`;
+Gemas disponibles:
+${spotsContextText}`;
 
       const geminiEndpoints = [
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
@@ -168,7 +156,7 @@ ${spotsContextText}
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nCONSULTA: "${prompt}"` }] }],
+              contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nSolicitud: "${prompt}"` }] }],
               generationConfig: { responseMimeType: 'application/json', temperature: 0.2 }
             })
           });
@@ -183,25 +171,24 @@ ${spotsContextText}
             }
           }
         } catch (e) {
-          console.warn('Gemini error, pasando a motor interno:', e);
+          console.warn('Gemini error:', e);
         }
       }
     }
 
-    // 6. MOTOR LOCAL INTELIGENTE (100% Datos Reales sin Texto Genérico)
     if (!itineraryJson) {
       const day1Spots = selectedSpots.slice(0, 2);
       const day2Spots = selectedSpots.slice(2, 4);
 
       itineraryJson = {
-        title: `Ruta de Exploración: ${prompt}`,
+        title: `Ruta de Exploracion: ${prompt}`,
         destination: detectedRegionName,
         estimated_budget: 'Presupuesto Medio',
-        summary: `Itinerario optimizado con gemas auténticas y miradores destacados en ${detectedRegionName}.`,
+        summary: `Itinerario optimizado con gemas autenticas en ${detectedRegionName}.`,
         days: [
           {
             day: 1,
-            title: `Día 1: Inmersión y Naturaleza en ${detectedRegionName}`,
+            title: `Dia 1: Exploracion en ${detectedRegionName}`,
             activities: day1Spots.map((spot, idx) => ({
               time: idx === 0 ? '8:30 AM' : '2:00 PM',
               activity: spot.title,
@@ -211,11 +198,11 @@ ${spotsContextText}
           },
           {
             day: 2,
-            title: `Día 2: Sabores Locales y Puntos Escénicos`,
+            title: `Dia 2: Sabores y Miradores Locales`,
             activities: (day2Spots.length > 0 ? day2Spots : day1Spots).map((spot, idx) => ({
               time: idx === 0 ? '11:00 AM' : '4:30 PM',
               activity: spot.title,
-              description: spot.description || `Disfrutá de la oferta local en ${spot.address_text || detectedRegionName}.`,
+              description: spot.description || `Disfruta de la oferta local en ${spot.address_text || detectedRegionName}.`,
               spot_id: spot.id
             }))
           }
@@ -224,7 +211,6 @@ ${spotsContextText}
       };
     }
 
-    // 7. Extraer las gemas exactas para el mapa
     const routeIds = itineraryJson.recommended_spot_ids || [];
     let finalRouteSpots = selectedSpots.filter(s => routeIds.includes(s.id));
     if (finalRouteSpots.length === 0) {
@@ -238,7 +224,7 @@ ${spotsContextText}
     }, { status: 200 });
 
   } catch (err: any) {
-    console.error('Error crítico en copilot route:', err);
+    console.error('Error en copilot route:', err);
     return NextResponse.json({ success: false, error: err?.message || 'Error interno de servidor' }, { status: 500 });
   }
 }
