@@ -5,62 +5,77 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const defaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+// Corregir icono por defecto de Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Icono Estándar
+const defaultIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
   shadowSize: [41, 41]
 });
 
-// Icono personalizado para los puntos de la ruta del Copiloto IA
-function createNumberedIcon(number: number) {
-  return L.divIcon({
-    className: 'custom-route-icon',
-    html: `<div style="background-color: #06b6d4; color: #020617; font-weight: 900; font-size: 11px; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">${number}</div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-  });
-}
-
-function MapController({ selectedSpot, routeSpots }: { selectedSpot: any; routeSpots?: any[] }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (selectedSpot && selectedSpot.latitude && selectedSpot.longitude) {
-      map.flyTo([selectedSpot.latitude, selectedSpot.longitude], 14, { duration: 1.5 });
-    } else if (routeSpots && routeSpots.length > 0) {
-      const bounds = L.latLngBounds(routeSpots.map(s => [s.latitude, s.longitude]));
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13, animate: true });
-    }
-  }, [selectedSpot, routeSpots, map]);
-
-  return null;
-}
+// Icono Destacado para Ruta de IA / Viaje
+const routeIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [30, 48],
+  iconAnchor: [15, 48],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
 
 interface MapClientProps {
   spots: any[];
-  selectedSpot: any;
+  selectedSpot?: any;
   onSelectSpot: (spot: any) => void;
   routeSpots?: any[];
 }
 
-export default function MapClient({ spots, selectedSpot, onSelectSpot, routeSpots = [] }: MapClientProps) {
-  const defaultCenter: [number, number] = [9.7489, -83.7534];
-  const defaultZoom = 8;
+// Componente para controlar la cámara y zoom en el mapa
+function MapController({ routeSpots, selectedSpot }: { routeSpots?: any[]; selectedSpot?: any }) {
+  const map = useMap();
 
-  // Extraer puntos válidos para trazar la línea de la ruta
-  const routePolylineCoords: [number, number][] = routeSpots
-    .filter(s => s.latitude && s.longitude)
-    .map(s => [s.latitude, s.longitude]);
+  useEffect(() => {
+    if (selectedSpot?.latitude && selectedSpot?.longitude) {
+      map.flyTo([parseFloat(selectedSpot.latitude), parseFloat(selectedSpot.longitude)], 14, { duration: 1.5 });
+    } else if (routeSpots && routeSpots.length > 0) {
+      const validCoords = routeSpots
+        .filter(s => s?.latitude && s?.longitude)
+        .map(s => [parseFloat(s.latitude), parseFloat(s.longitude)] as [number, number]);
+
+      if (validCoords.length > 0) {
+        const bounds = L.latLngBounds(validCoords);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14, animate: true });
+      }
+    }
+  }, [routeSpots, selectedSpot, map]);
+
+  return null;
+}
+
+export default function MapClient({ spots, selectedSpot, onSelectSpot, routeSpots = [] }: MapClientProps) {
+  // Centro por defecto: Costa Rica
+  const defaultCenter: [number, number] = [9.7489, -83.7534];
+
+  // Coordenadas para la línea de ruta
+  const routePolylineCoords = routeSpots
+    .filter(s => s?.latitude && s?.longitude)
+    .map(s => [parseFloat(s.latitude), parseFloat(s.longitude)] as [number, number]);
 
   return (
     <MapContainer
       center={defaultCenter}
-      zoom={defaultZoom}
-      className="w-full h-full z-0"
+      zoom={8}
+      style={{ width: '100%', height: '100%' }}
       zoomControl={false}
     >
       <TileLayer
@@ -68,45 +83,38 @@ export default function MapClient({ spots, selectedSpot, onSelectSpot, routeSpot
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      <MapController selectedSpot={selectedSpot} routeSpots={routeSpots} />
+      <MapController routeSpots={routeSpots} selectedSpot={selectedSpot} />
 
-      {/* Trazado de línea de la ruta cuando hay itinerario de IA activo */}
+      {/* Línea Verde de Ruta Trazada */}
       {routePolylineCoords.length > 1 && (
         <Polyline
           positions={routePolylineCoords}
-          pathOptions={{ color: '#06b6d4', weight: 4, opacity: 0.8, dashArray: '8, 8' }}
+          pathOptions={{ color: '#059669', weight: 4, dashArray: '8, 8', opacity: 0.8 }}
         />
       )}
 
-      {/* Renderizar marcadores normales o de ruta */}
+      {/* Renderizado de Gemas */}
       {spots.map((spot) => {
-        let lat = spot.latitude;
-        let lng = spot.longitude;
+        if (!spot.latitude || !spot.longitude) return null;
+        const lat = parseFloat(spot.latitude);
+        const lon = parseFloat(spot.longitude);
+        if (isNaN(lat) || isNaN(lon)) return null;
 
-        if (!lat || !lng) return null;
-
-        const routeIndex = routeSpots.findIndex(rs => rs.id === spot.id);
-        const isRouteSpot = routeIndex !== -1;
-        const iconToUse = isRouteSpot ? createNumberedIcon(routeIndex + 1) : defaultIcon;
+        const isPartOfRoute = routeSpots.some(r => r.id === spot.id);
 
         return (
           <Marker
-            key={spot.id || spot.title}
-            position={[lat, lng]}
-            icon={iconToUse}
+            key={spot.id}
+            position={[lat, lon]}
+            icon={isPartOfRoute ? routeIcon : defaultIcon}
             eventHandlers={{
-              click: () => onSelectSpot(spot)
+              click: () => onSelectSpot(spot),
             }}
           >
             <Popup>
-              <div className="text-xs space-y-1">
-                <p className="font-bold text-slate-900">{spot.title}</p>
-                <p className="text-slate-600">{spot.address_text}</p>
-                {isRouteSpot && (
-                  <span className="inline-block text-[10px] bg-cyan-100 text-cyan-800 px-1.5 py-0.5 rounded font-bold">
-                    Parada #{routeIndex + 1} de la ruta
-                  </span>
-                )}
+              <div className="p-1 text-xs space-y-1 font-sans">
+                <strong className="block text-slate-900 font-extrabold">{spot.title}</strong>
+                <p className="text-slate-600 text-[10px]">{spot.address_text || 'Costa Rica'}</p>
               </div>
             </Popup>
           </Marker>

@@ -6,9 +6,7 @@ import {
   X, 
   Send, 
   Bot, 
-  User, 
   Sparkles, 
-  MapPin, 
   Route, 
   CheckCircle2, 
   BookmarkPlus, 
@@ -39,7 +37,7 @@ export default function AICopilotDrawer({
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: '¡Hola! Soy tu Copiloto de Inteligencia Artificial para Costa Rica. Decime qué tipo de viaje tenés en mente (ej: "Ruta de 2 días en Monteverde con miradores y café") y te armo el itinerario.'
+      content: '¡Hola! Soy tu Copiloto Turístico IA. Decime qué querés explorar (ej: "Ruta de café y miradores cerca de Sarchí") y te trazo los puntos en el mapa.'
     }
   ]);
 
@@ -61,7 +59,8 @@ export default function AICopilotDrawer({
     if (!promptText.trim() || loading) return;
 
     const userMessage: Message = { role: 'user', content: promptText };
-    setMessages(prev => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     if (!textToSend) setInputPrompt('');
     setLoading(true);
 
@@ -69,7 +68,10 @@ export default function AICopilotDrawer({
       const res = await fetch('/api/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptText })
+        body: JSON.stringify({ 
+          prompt: promptText,
+          history: updatedMessages.map(m => ({ role: m.role, content: m.content }))
+        })
       });
 
       const data = await res.json();
@@ -87,12 +89,12 @@ export default function AICopilotDrawer({
         }
       }
     } catch (err) {
-      console.error('Error enviando mensaje al copiloto:', err);
+      console.error('Error conversando con el copiloto:', err);
       setMessages(prev => [
         ...prev,
         {
           role: 'assistant',
-          content: 'Ocurrió un error al procesar tu solicitud. Por favor intenta de nuevo.'
+          content: 'Ocurrió un pequeño inconveniente al consultar las gemas. Por favor intentá de nuevo.'
         }
       ]);
     } finally {
@@ -100,7 +102,6 @@ export default function AICopilotDrawer({
     }
   };
 
-  // Guardar Ruta de IA directamente en la tabla trips de Supabase
   const handleSaveAIRouteToMyTrips = async (spots: any[], originalPrompt: string) => {
     if (!spots || spots.length === 0) return;
 
@@ -113,9 +114,8 @@ export default function AICopilotDrawer({
     setSavingTripId(originalPrompt);
 
     try {
-      const tripTitle = `Viaje IA: ${originalPrompt.slice(0, 30)}...`;
+      const tripTitle = `Viaje IA: ${originalPrompt.slice(0, 25)}...`;
 
-      // 1. Crear viaje con flag is_ai_generated = true
       const { data: tripData, error: tripError } = await supabase
         .from('trips')
         .insert([
@@ -132,7 +132,6 @@ export default function AICopilotDrawer({
 
       if (tripError) throw tripError;
 
-      // 2. Asignar las gemas recomendadas
       const spotsPayload = spots.map((spot, index) => ({
         trip_id: tripData.id,
         spot_id: spot.id,
@@ -141,16 +140,12 @@ export default function AICopilotDrawer({
         estimated_cost: parseFloat(spot.entry_fee?.match(/\d+/g)?.[0] || '0')
       }));
 
-      const { error: spotsError } = await supabase
-        .from('trip_spots')
-        .insert(spotsPayload);
-
-      if (spotsError) throw spotsError;
+      await supabase.from('trip_spots').insert(spotsPayload);
 
       setSavedSuccessMsg('¡Viaje guardado en "Mis Viajes"!');
       setTimeout(() => setSavedSuccessMsg(null), 3000);
     } catch (err: any) {
-      alert(`Error al guardar el viaje de IA: ${err?.message || err}`);
+      alert(`Error guardando viaje de IA: ${err?.message || err}`);
     } finally {
       setSavingTripId(null);
     }
@@ -170,7 +165,7 @@ export default function AICopilotDrawer({
               <span>Copiloto Turístico IA</span>
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             </h3>
-            <p className="text-[10px] text-slate-500">Recomendaciones personalizadas</p>
+            <p className="text-[10px] text-slate-500">Búsqueda y rutas inteligentes</p>
           </div>
         </div>
         <button onClick={onClose} className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400">
@@ -199,7 +194,7 @@ export default function AICopilotDrawer({
             )}
 
             <div
-              className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${
+              className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed whitespace-pre-line ${
                 msg.role === 'user'
                   ? 'bg-emerald-600 text-white rounded-br-none font-medium'
                   : 'bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-bl-none text-slate-800 dark:text-slate-200'
@@ -207,13 +202,12 @@ export default function AICopilotDrawer({
             >
               <p>{msg.content}</p>
 
-              {/* Si el mensaje tiene lugares sugeridos, mostramos CTA para guardar */}
               {msg.suggestedSpots && msg.suggestedSpots.length > 0 && (
                 <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                       <Route className="w-3 h-3" />
-                      Ruta trazada ({msg.suggestedSpots.length} gemas)
+                      Ruta enfocada en mapa ({msg.suggestedSpots.length} gemas)
                     </span>
                   </div>
 
@@ -244,7 +238,7 @@ export default function AICopilotDrawer({
         {loading && (
           <div className="flex items-center gap-2 text-xs text-slate-400 p-2">
             <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
-            <span>Diseñando tu itinerario ideal...</span>
+            <span>Consultando gemas y trazando mapa...</span>
           </div>
         )}
       </div>
@@ -254,7 +248,7 @@ export default function AICopilotDrawer({
         <div className="flex items-center gap-1.5">
           <input
             type="text"
-            placeholder="Ej: ¿Qué puedo hacer cerca de Manuel Antonio?"
+            placeholder="Ej: Ruta de café y miradores en Sarchí..."
             value={inputPrompt}
             onChange={e => setInputPrompt(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
