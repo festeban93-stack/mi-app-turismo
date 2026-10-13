@@ -21,10 +21,13 @@ export default function HomePage() {
   useEffect(() => {
     async function fetchSpots() {
       try {
-        const res = await fetch('/api/spots');
+        // Deshabilitar cache del navegador agregando timestamp dinamico
+        const res = await fetch(`/api/spots?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         const json = await res.json();
         
-        // Soporta respuesta en formato objeto { spots: [...] } o array puro [...]
         const rawSpots = Array.isArray(json) 
           ? json 
           : (json.spots || json.data || []);
