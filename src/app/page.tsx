@@ -10,7 +10,8 @@ import AICopilotDrawer from '@/components/AICopilotDrawer';
 import AuthModal from '@/components/AuthModal';
 import UserProfileModal from '@/components/UserProfileModal';
 import CustomTripModal from '@/components/CustomTripModal';
-import { Plus, Bot, Trash2, User, Compass } from 'lucide-react';
+import MyTripsDrawer from '@/components/MyTripsDrawer';
+import { Plus, Bot, Trash2, User, Compass, BookmarkCheck } from 'lucide-react';
 
 const MapWithNoSSR = dynamic(() => import('@/components/MapClient'), {
   ssr: false,
@@ -43,7 +44,9 @@ export default function HomePage() {
 
   // Modales y Drawers
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [prefilledGemaTitle, setPrefilledGemaTitle] = useState<string>('');
   const [isCustomTripModalOpen, setIsCustomTripModalOpen] = useState<boolean>(false);
+  const [isMyTripsDrawerOpen, setIsMyTripsDrawerOpen] = useState<boolean>(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState<boolean>(false);
   const [copilotInitialPrompt, setCopilotInitialPrompt] = useState<string>('');
   const [routeSpots, setRouteSpots] = useState<any[]>([]);
@@ -240,6 +243,16 @@ export default function HomePage() {
           <span>Crear Viaje</span>
         </button>
 
+        {currentUser && (
+          <button
+            onClick={() => setIsMyTripsDrawerOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-bold text-[11px] shadow-lg hover:bg-slate-100 transition-all"
+          >
+            <BookmarkCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Mis Viajes</span>
+          </button>
+        )}
+
         <button
           onClick={handleOpenAddSpot}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-lg active:scale-95 transition-all"
@@ -313,6 +326,17 @@ export default function HomePage() {
         availableSpots={spots}
         onApplyTripToMap={(spotsForRoute) => setRouteSpots(spotsForRoute)}
         onRequireAuth={handleOpenAuthForLogin}
+        onOpenAddSpotWithTitle={(title) => {
+          setPrefilledGemaTitle(title);
+          setIsAddModalOpen(true);
+        }}
+      />
+
+      <MyTripsDrawer
+        isOpen={isMyTripsDrawerOpen}
+        onClose={() => setIsMyTripsDrawerOpen(false)}
+        currentUser={currentUser}
+        onApplyTripToMap={(spotsForRoute) => setRouteSpots(spotsForRoute)}
       />
 
       <AICopilotDrawer
@@ -328,7 +352,10 @@ export default function HomePage() {
 
       <AddSpotModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setPrefilledGemaTitle('');
+        }}
         onSpotAdded={(newSpot) => {
           setSpots((prev) => [newSpot, ...prev]);
           setSelectedSpot(newSpot);
