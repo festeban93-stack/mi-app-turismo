@@ -11,6 +11,51 @@ function normalizeText(text: string = ''): string {
     .trim();
 }
 
+// Decodificador WKB de PostGIS para garantizar lat/lng numericas
+function parseCoordinates(spot: any): { lat: number; lng: number } {
+  const rawLat = parseFloat(spot.latitude);
+  const rawLng = parseFloat(spot.longitude);
+  if (!isNaN(rawLat) && !isNaN(rawLng) && rawLat !== 0 && rawLng !== 0) {
+    return { lat: rawLat, lng: rawLng };
+  }
+
+  const loc = spot.location;
+  if (!loc) return { lat: 9.7489, lng: -83.7534 };
+
+  if (typeof loc === 'object' && Array.isArray(loc.coordinates)) {
+    const lng = parseFloat(loc.coordinates[0]);
+    const lat = parseFloat(loc.coordinates[1]);
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+  }
+
+  if (typeof loc === 'string') {
+    const wktMatch = loc.match(/POINT\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+    if (wktMatch) {
+      const lng = parseFloat(wktMatch[1]);
+      const lat = parseFloat(wktMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+    }
+
+    if (/^[0-9a-fA-F]+$/.test(loc) && loc.length >= 42) {
+      try {
+        const buf = Buffer.from(loc, 'hex');
+        const isLittle = buf[0] === 1;
+        const rawType = isLittle ? buf.readUInt32LE(1) : buf.readUInt32BE(1);
+        const hasSRID = (rawType & 0x20000000) !== 0;
+        const offset = 1 + 4 + (hasSRID ? 4 : 0);
+
+        const lng = isLittle ? buf.readDoubleLE(offset) : buf.readDoubleBE(offset);
+        const lat = isLittle ? buf.readDoubleLE(offset + 8) : buf.readDoubleBE(offset + 8);
+        if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+      } catch (e) {
+        // Fallback a coordenadas por defecto
+      }
+    }
+  }
+
+  return { lat: 9.7489, lng: -83.7534 };
+}
+
 const REGION_KEYWORDS: Record<string, string[]> = {
   guanacaste: ['guanacaste', 'tamarindo', 'liberia', 'flamingo', 'conchal', 'nosara', 'samara', 'santa cruz', 'papagayo', 'herradura', 'avellanas', 'playa'],
   fortuna: ['fortuna', 'arenal', 'san carlos', 'volcan', 'aguas termales', 'la fortuna', 'venado'],
@@ -43,24 +88,15 @@ export async function POST(request: Request) {
       .select('*')
       .order('created_at', { ascending: false });
 
+    // Parseo de coordenadas WKB
     const cleanSpots = (allSpotsRaw || []).map((spot: any) => {
-      let lat = parseFloat(spot.latitude);
-      let lng = parseFloat(spot.longitude);
-
-      if ((isNaN(lat) || isNaN(lng)) && spot.location) {
-        const match = String(spot.location).match(/POINT\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
-        if (match) {
-          lng = parseFloat(match[1]);
-          lat = parseFloat(match[2]);
-        }
-      }
-
+      const coords = parseCoordinates(spot);
       return {
         ...spot,
-        latitude: lat,
-        longitude: lng,
+        latitude: coords.lat,
+        longitude: coords.lng,
       };
-    }).filter((s: any) => !isNaN(s.latitude) && !isNaN(s.longitude));
+    });
 
     const promptNorm = normalizeText(prompt);
     let matchedRegionKeywords: string[] = [];
@@ -79,6 +115,7 @@ export async function POST(request: Request) {
       }
     }
 
+    // Calificar spots por relevancia
     const scoredSpots = cleanSpots.map(spot => {
       let score = 0;
       const titleNorm = normalizeText(spot.title);
@@ -104,8 +141,8 @@ export async function POST(request: Request) {
     scoredSpots.sort((a, b) => b.score - a.score);
 
     let selectedSpots = scoredSpots.filter(item => item.score > 0).map(item => item.spot);
-    if (selectedSpots.length < 3) {
-      selectedSpots = cleanSpots.slice(0, 5);
+    if (selectedSpots.length < 4) {
+      selectedSpots = cleanSpots.slice(0, 6);
     } else {
       selectedSpots = selectedSpots.slice(0, 6);
     }
@@ -176,9 +213,10 @@ ${spotsContextText}`;
       }
     }
 
-    if (!itineraryJson) {
+    // Motor local garantizado de respaldo con datos reales de la BD
+    if (!itineraryJson || !itineraryJson.days || itineraryJson.days.length === 0) {
       const day1Spots = selectedSpots.slice(0, 2);
-      const day2Spots = selectedSpots.slice(2, 4);
+      const day2Spots = selectedSpots.length >= 4 ? selectedSpots.slice(2, 4) : selectedSpots.slice(0, 2);
 
       itineraryJson = {
         title: `Ruta de Exploracion: ${prompt}`,
@@ -199,7 +237,7 @@ ${spotsContextText}`;
           {
             day: 2,
             title: `Dia 2: Sabores y Miradores Locales`,
-            activities: (day2Spots.length > 0 ? day2Spots : day1Spots).map((spot, idx) => ({
+            activities: day2Spots.map((spot, idx) => ({
               time: idx === 0 ? '11:00 AM' : '4:30 PM',
               activity: spot.title,
               description: spot.description || `Disfruta de la oferta local en ${spot.address_text || detectedRegionName}.`,
