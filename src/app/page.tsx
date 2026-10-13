@@ -9,7 +9,8 @@ import AddSpotModal from '@/components/AddSpotModal';
 import AICopilotDrawer from '@/components/AICopilotDrawer';
 import AuthModal from '@/components/AuthModal';
 import UserProfileModal from '@/components/UserProfileModal';
-import { Plus, Bot, Trash2, User } from 'lucide-react';
+import CustomTripModal from '@/components/CustomTripModal';
+import { Plus, Bot, Trash2, User, Compass } from 'lucide-react';
 
 const MapWithNoSSR = dynamic(() => import('@/components/MapClient'), {
   ssr: false,
@@ -38,10 +39,11 @@ export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
-  const [authIntent, setAuthIntent] = useState<'LOGIN_ONLY' | 'ADD_SPOT' | null>(null);
+  const [authIntent, setAuthIntent] = useState<'LOGIN_ONLY' | 'ADD_SPOT' | 'CUSTOM_TRIP' | null>(null);
 
   // Modales y Drawers
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [isCustomTripModalOpen, setIsCustomTripModalOpen] = useState<boolean>(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState<boolean>(false);
   const [copilotInitialPrompt, setCopilotInitialPrompt] = useState<string>('');
   const [routeSpots, setRouteSpots] = useState<any[]>([]);
@@ -93,10 +95,21 @@ export default function HomePage() {
     }
   };
 
+  const handleOpenCustomTrip = () => {
+    if (!currentUser) {
+      setAuthIntent('CUSTOM_TRIP');
+      setIsAuthModalOpen(true);
+    } else {
+      setIsCustomTripModalOpen(true);
+    }
+  };
+
   const handleAuthSuccess = () => {
     setIsAuthModalOpen(false);
     if (authIntent === 'ADD_SPOT') {
       setIsAddModalOpen(true);
+    } else if (authIntent === 'CUSTOM_TRIP') {
+      setIsCustomTripModalOpen(true);
     }
     setAuthIntent(null);
   };
@@ -209,7 +222,7 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* 3. FABS FLOTANTES */}
+      {/* 3. FABS FLOTANTES COMPACTOS */}
       <div className="fixed bottom-4 left-3 z-40 flex items-center gap-1.5 pointer-events-auto">
         <button
           onClick={() => setIsCopilotOpen(true)}
@@ -217,6 +230,14 @@ export default function HomePage() {
         >
           <Bot className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
           <span>Copiloto</span>
+        </button>
+
+        <button
+          onClick={handleOpenCustomTrip}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-950 font-bold text-[11px] shadow-lg hover:brightness-110 active:scale-95 transition-all"
+        >
+          <Compass className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
+          <span>Crear Viaje</span>
         </button>
 
         <button
@@ -283,6 +304,15 @@ export default function HomePage() {
         currentUser={currentUser}
         onSignOut={handleSignOut}
         availableSpots={spots}
+      />
+
+      <CustomTripModal
+        isOpen={isCustomTripModalOpen}
+        onClose={() => setIsCustomTripModalOpen(false)}
+        currentUser={currentUser}
+        availableSpots={spots}
+        onApplyTripToMap={(spotsForRoute) => setRouteSpots(spotsForRoute)}
+        onRequireAuth={handleOpenAuthForLogin}
       />
 
       <AICopilotDrawer
