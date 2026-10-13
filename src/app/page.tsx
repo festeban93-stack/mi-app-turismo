@@ -1,8 +1,10 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import DiscoveryHub from '@/components/DiscoveryHub';
+import AddSpotModal from '@/components/AddSpotModal';
+import { PlusCircle, Sparkles } from 'lucide-react';
 
 const MapWithNoSSR = dynamic(() => import('@/components/MapClient'), {
   ssr: false,
@@ -17,26 +19,33 @@ export default function HomePage() {
   const [spots, setSpots] = useState<any[]>([]);
   const [selectedSpot, setSelectedSpot] = useState<any | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('Todas');
+  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+
+  const fetchSpots = async () => {
+    try {
+      const res = await fetch(`/api/spots?t=${Date.now()}`, {
+        cache: 'no-store',
+      });
+      const json = await res.json();
+      
+      const rawSpots = Array.isArray(json) 
+        ? json 
+        : (json.spots || json.data || []);
+
+      setSpots(rawSpots);
+    } catch (err) {
+      console.error('Error cargando spots:', err);
+    }
+  };
 
   useEffect(() => {
-    async function fetchSpots() {
-      try {
-        const res = await fetch(`/api/spots?t=${Date.now()}`, {
-          cache: 'no-store',
-        });
-        const json = await res.json();
-        
-        const rawSpots = Array.isArray(json) 
-          ? json 
-          : (json.spots || json.data || []);
-
-        setSpots(rawSpots);
-      } catch (err) {
-        console.error('Error cargando spots:', err);
-      }
-    }
     fetchSpots();
   }, []);
+
+  const handleSpotAdded = (newSpot: any) => {
+    setSpots((prev) => [newSpot, ...prev]);
+    setSelectedSpot(newSpot);
+  };
 
   const filteredSpots = activeCategory === 'Todas'
     ? spots
@@ -89,10 +98,23 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 3. PANEL RESPONSIVO: BOTTOM SHEET EN MÓVIL / SIDEBAR EN DESKTOP */}
+      {/* 3. BOTÓN FLOTANTE GAMIFICADO (FAB) */}
+      <div className="fixed bottom-6 left-4 z-40 pointer-events-auto">
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-extrabold text-xs shadow-2xl hover:scale-105 active:scale-95 transition-all border border-emerald-300/40 group"
+        >
+          <PlusCircle className="w-4 h-4 text-slate-950 group-hover:rotate-90 transition-transform" />
+          <span>+ Reportar Gema Oculta</span>
+          <span className="px-1.5 py-0.5 rounded-md bg-slate-950/20 text-[10px] font-black">
+            +50 Pts
+          </span>
+        </button>
+      </div>
+
+      {/* 4. PANEL RESPONSIVO */}
       <div className="fixed bottom-0 left-0 right-0 z-30 md:absolute md:top-16 md:bottom-auto md:left-auto md:right-4 md:w-96 pointer-events-auto transition-all duration-300">
         {selectedSpot ? (
-          /* Tarjeta de Detalle del Spot */
           <div className="w-full bg-slate-900/95 backdrop-blur-xl border-t md:border border-slate-800 rounded-t-3xl md:rounded-2xl p-5 shadow-2xl space-y-4 max-h-[70vh] md:max-h-[calc(100vh-5rem)] overflow-y-auto custom-scrollbar">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <span className="px-2.5 py-0.5 text-[10px] uppercase tracking-wider font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -112,6 +134,11 @@ export default function HomePage() {
               <p><strong>🕒 Horario:</strong> {selectedSpot.opening_hours || 'Lunes a Domingo 8:00 AM - 5:00 PM'}</p>
               <p><strong>🎟️ Entrada:</strong> {selectedSpot.entry_fee || 'Entrada Libre'}</p>
               <p><strong>📍 Dirección:</strong> {selectedSpot.address_text || 'Costa Rica'}</p>
+              {selectedSpot.source_type === 'crowdsource' && (
+                <p className="text-emerald-400 flex items-center gap-1 font-semibold">
+                  <Sparkles className="w-3 h-3" /> Gema aportada por la comunidad
+                </p>
+              )}
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
@@ -126,7 +153,6 @@ export default function HomePage() {
             </button>
           </div>
         ) : (
-          /* Hub de Descubrimiento */
           <div className="w-full max-h-[60vh] md:max-h-[calc(100vh-5.5rem)] overflow-y-auto rounded-t-3xl md:rounded-2xl custom-scrollbar shadow-2xl">
             <DiscoveryHub
               totalSpotsCount={spots.length}
@@ -134,11 +160,18 @@ export default function HomePage() {
               onSelectCategory={(cat) => setActiveCategory(cat)}
               onSelectSpot={(spot) => setSelectedSpot(spot)}
               onOpenAICopilot={(prompt) => console.log('Copiloto IA:', prompt)}
-              onOpenAddSpotModal={() => console.log('Modal Aportar Gema')}
+              onOpenAddSpotModal={() => setIsAddModalOpen(true)}
             />
           </div>
         )}
       </div>
+
+      {/* 5. MODAL CROWDSOURCING GAMIFICADO */}
+      <AddSpotModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSpotAdded={handleSpotAdded}
+      />
     </main>
   );
 }
