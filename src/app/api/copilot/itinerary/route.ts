@@ -18,7 +18,7 @@ const REGION_KEYWORDS: Record<string, string[]> = {
   cartago: ['cartago', 'orosi', 'turrialba', 'irazu', 'prusia', 'paraiso', 'guayabo'],
   sanjose: ['san jose', 'escalante', 'sabana', 'amon', 'central', 'pavas', 'santa ana', 'escazu'],
   limon: ['limon', 'puerto viejo', 'cahuita', 'manzanillo', 'cocles', 'punta uva', 'talamanca', 'caribe'],
-  puntarenas: ['puntarenas', 'jaco', 'manuel antonio', 'quepos', 'uvita', 'montezuma', 'santa teresa', 'drake', 'domical']
+  puntarenas: ['puntarenas', 'jaco', 'manuel antonio', 'quepos', 'uvita', 'montezuma', 'santa teresa', 'drake', 'dominical']
 };
 
 export async function POST(request: Request) {
