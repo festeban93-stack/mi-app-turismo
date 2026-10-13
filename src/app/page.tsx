@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import DiscoveryHub from '@/components/DiscoveryHub';
 
-// Carga dinámica del mapa para evitar errores de SSR con Leaflet
 const MapWithNoSSR = dynamic(() => import('@/components/MapClient'), {
   ssr: false,
   loading: () => (
@@ -16,35 +15,55 @@ const MapWithNoSSR = dynamic(() => import('@/components/MapClient'), {
 
 export default function HomePage() {
   const [spots, setSpots] = useState<any[]>([]);
-  const [selectedSpot, setSelectedSpot] = useState<any | null>(null); // Nulo al inicio para mostrar el Hub
+  const [selectedSpot, setSelectedSpot] = useState<any | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('Todas');
-  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Cargar spots desde Supabase / API
   useEffect(() => {
     async function fetchSpots() {
       try {
         const res = await fetch('/api/spots');
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setSpots(data);
-        }
+        const json = await res.json();
+        
+        // Soporta respuesta en formato objeto { spots: [...] } o array puro [...]
+        const rawSpots = Array.isArray(json) 
+          ? json 
+          : (json.spots || json.data || []);
+
+        // Sanitización y parseo estricto de coordenadas PostGIS POINT(lng lat)
+        const cleanSpots = rawSpots.map((s: any) => {
+          let lat = s.latitude;
+          let lng = s.longitude;
+
+          if ((!lat || !lng || isNaN(Number(lat))) && s.location) {
+            const match = String(s.location).match(/POINT\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+            if (match) {
+              lng = parseFloat(match[1]);
+              lat = parseFloat(match[2]);
+            }
+          }
+
+          return {
+            ...s,
+            latitude: typeof lat === 'number' ? lat : parseFloat(lat),
+            longitude: typeof lng === 'number' ? lng : parseFloat(lng),
+          };
+        }).filter((s: any) => !isNaN(s.latitude) && !isNaN(s.longitude));
+
+        setSpots(cleanSpots);
       } catch (err) {
         console.error('Error cargando spots:', err);
-      } finally {
-        setIsLoading(false);
       }
     }
     fetchSpots();
   }, []);
 
-  // Filtrar spots segun la categoria seleccionada
   const filteredSpots = activeCategory === 'Todas'
     ? spots
     : spots.filter((s) => s.category?.toLowerCase() === activeCategory.toLowerCase());
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans">
+    <main className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans text-slate-100 select-none">
+      
       {/* 1. MAPA INTERACTIVO DE FONDO */}
       <div className="absolute inset-0 z-0">
         <MapWithNoSSR
@@ -54,33 +73,33 @@ export default function HomePage() {
         />
       </div>
 
-      {/* 2. BARRA SUPERIOR DE NAVEGACIÓN Y FILTROS */}
-      <div className="absolute top-4 left-4 right-4 md:right-auto z-10 flex flex-wrap items-center gap-2 pointer-events-auto">
-        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-xl px-3 py-2 text-white text-xs font-bold shadow-lg flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs">
+      {/* 2. HEADER FLOTANTE RESPONSIVO (Top Bar) */}
+      <div className="absolute top-3 left-3 right-3 md:right-auto z-20 flex items-center justify-between md:justify-start gap-2 pointer-events-auto">
+        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-xl px-3 py-2 text-white shadow-xl flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-950 font-black flex items-center justify-center text-xs shadow-md">
             CR
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span>MapAI Costa Rica</span>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-semibold">
+              <span className="text-xs font-bold tracking-tight">MapAI Costa Rica</span>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-semibold">
                 Live DB ({spots.length})
               </span>
             </div>
-            <p className="text-[10px] text-slate-400 font-normal">Exploración e Itinerarios con IA</p>
+            <p className="text-[9px] text-slate-400">Exploración con IA</p>
           </div>
         </div>
 
-        {/* Categorias rapidas */}
-        <div className="flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md border border-slate-800 p-1 rounded-xl shadow-lg">
+        {/* Categorías deslizables */}
+        <div className="flex items-center gap-1 bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1 rounded-xl shadow-xl overflow-x-auto max-w-[200px] sm:max-w-none custom-scrollbar">
           {['Todas', 'gastronomia', 'naturaleza', 'aventura', 'cultura'].map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium capitalize transition-all ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold capitalize whitespace-nowrap transition-all ${
                 activeCategory === cat
-                  ? 'bg-cyan-500 text-slate-950 font-bold shadow'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               {cat}
@@ -89,29 +108,29 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 3. PANEL LATERAL DERECHO: DISCOVERY HUB O FICHA DE DETALLE */}
-      <div className="absolute top-20 right-4 z-20 w-full max-w-sm px-2 sm:px-0 pointer-events-auto">
+      {/* 3. PANEL RESPONSIVO: BOTTOM SHEET EN MÓVIL / SIDEBAR EN DESKTOP */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 md:absolute md:top-16 md:bottom-auto md:left-auto md:right-4 md:w-96 pointer-events-auto transition-all duration-300">
         {selectedSpot ? (
-          /* Tarjeta de detalle cuando se hace clic en un marcador */
-          <div className="w-full bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-2xl p-5 text-slate-100 shadow-2xl space-y-4 relative">
-            <button
-              onClick={() => setSelectedSpot(null)}
-              className="absolute top-4 right-4 p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white transition-colors"
-              title="Volver al Hub"
-            >
-              ✕
-            </button>
+          /* Tarjeta de Detalle del Spot */
+          <div className="w-full bg-slate-900/95 backdrop-blur-xl border-t md:border border-slate-800 rounded-t-3xl md:rounded-2xl p-5 shadow-2xl space-y-4 max-h-[70vh] md:max-h-[calc(100vh-5rem)] overflow-y-auto custom-scrollbar">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <span className="px-2.5 py-0.5 text-[10px] uppercase tracking-wider font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                {selectedSpot.category || 'naturaleza'}
+              </span>
+              <button
+                onClick={() => setSelectedSpot(null)}
+                className="w-7 h-7 rounded-full bg-slate-800/80 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors"
+              >
+                ✕
+              </button>
+            </div>
 
-            <span className="inline-block px-2.5 py-0.5 text-[10px] uppercase tracking-wider font-bold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              {selectedSpot.category || 'naturaleza'}
-            </span>
+            <h3 className="text-base font-bold text-white">{selectedSpot.title}</h3>
 
-            <h3 className="text-lg font-bold text-white pr-6">{selectedSpot.title}</h3>
-
-            <div className="space-y-2 text-xs text-slate-300 bg-slate-950/50 p-3 rounded-xl border border-slate-800/80">
+            <div className="space-y-1.5 text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
               <p><strong>🕒 Horario:</strong> {selectedSpot.opening_hours || 'Lunes a Domingo 8:00 AM - 5:00 PM'}</p>
-              <p><strong>🎟️ Costo:</strong> {selectedSpot.entry_fee || 'Entrada Gratuita'}</p>
-              <p><strong>📍 Ubicación:</strong> {selectedSpot.address_text || 'Costa Rica'}</p>
+              <p><strong>🎟️ Entrada:</strong> {selectedSpot.entry_fee || 'Entrada Libre'}</p>
+              <p><strong>📍 Dirección:</strong> {selectedSpot.address_text || 'Costa Rica'}</p>
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
@@ -120,21 +139,23 @@ export default function HomePage() {
 
             <button
               onClick={() => setSelectedSpot(null)}
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors border border-slate-700"
+              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition-colors border border-slate-700 shadow-md"
             >
               ← Volver a Explorar
             </button>
           </div>
         ) : (
-          /* Hub de Descubrimiento cuando no hay ningún lugar seleccionado */
-          <DiscoveryHub
-            totalSpotsCount={spots.length}
-            featuredSpots={spots.slice(0, 5)}
-            onSelectCategory={(cat) => setActiveCategory(cat)}
-            onSelectSpot={(spot) => setSelectedSpot(spot)}
-            onOpenAICopilot={(prompt) => console.log('Copiloto IA:', prompt)}
-            onOpenAddSpotModal={() => console.log('Abrir Modal Agregar Gema')}
-          />
+          /* Hub de Descubrimiento cuando no hay nada seleccionado */
+          <div className="w-full max-h-[60vh] md:max-h-[calc(100vh-5.5rem)] overflow-y-auto rounded-t-3xl md:rounded-2xl custom-scrollbar shadow-2xl">
+            <DiscoveryHub
+              totalSpotsCount={spots.length}
+              featuredSpots={spots.slice(0, 5)}
+              onSelectCategory={(cat) => setActiveCategory(cat)}
+              onSelectSpot={(spot) => setSelectedSpot(spot)}
+              onOpenAICopilot={(prompt) => console.log('Copiloto IA:', prompt)}
+              onOpenAddSpotModal={() => console.log('Modal Aportar Gema')}
+            />
+          </div>
         )}
       </div>
     </main>
