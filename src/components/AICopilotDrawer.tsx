@@ -8,7 +8,6 @@ import {
   Calendar, 
   Clock, 
   Loader2, 
-  Route, 
   ChevronRight,
   Bot,
   FileDown,
@@ -86,14 +85,14 @@ export default function AICopilotDrawer({
           <title>${itineraryResult.title || 'Itinerario MapAI'}</title>
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 30px; color: #0f172a; max-width: 800px; margin: 0 auto; line-height: 1.5; }
-            .header { border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
-            .logo { font-size: 20px; font-weight: 900; color: #0284c7; letter-spacing: -0.5px; }
+            .header { border-bottom: 2px solid #059669; padding-bottom: 15px; margin-bottom: 20px; }
+            .logo { font-size: 20px; font-weight: 900; color: #059669; letter-spacing: -0.5px; }
             h1 { font-size: 22px; margin: 10px 0 5px; color: #0f172a; }
-            .badge { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; margin-right: 6px; }
-            .summary { font-size: 13px; color: #475569; margin: 15px 0; background: #f8fafc; padding: 12px; border-radius: 8px; border-left: 4px solid #0284c7; }
+            .badge { display: inline-block; background: #ecfdf5; color: #047857; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; margin-right: 6px; border: 1px solid #a7f3d0; }
+            .summary { font-size: 13px; color: #475569; margin: 15px 0; background: #f8fafc; padding: 12px; border-radius: 8px; border-left: 4px solid #059669; }
             .day-title { font-size: 15px; font-weight: 800; color: #0f172a; margin-top: 25px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
-            .activity { margin: 12px 0 12px 12px; padding-left: 12px; border-left: 2px solid #cbd5e1; }
-            .act-time { font-weight: 700; font-size: 12px; color: #0284c7; }
+            .activity { margin: 12px 0 12px 12px; padding-left: 12px; border-left: 2px solid #a7f3d0; }
+            .act-time { font-weight: 700; font-size: 12px; color: #059669; }
             .act-name { font-weight: 700; font-size: 13px; color: #1e293b; margin: 2px 0; }
             .act-desc { font-size: 12px; color: #64748b; }
             .footer { margin-top: 40px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px; }
@@ -133,40 +132,31 @@ export default function AICopilotDrawer({
     }, 250);
   };
 
-  const handleCloseDrawer = () => {
-    onClose();
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    generateItinerary(promptInput);
-  };
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full md:w-[420px] bg-slate-950/95 backdrop-blur-2xl border-l border-slate-800/80 text-slate-100 shadow-2xl flex flex-col animate-slide-left">
+    <div className="fixed inset-y-0 right-0 z-50 w-full md:w-[420px] bg-white/95 dark:bg-slate-950/95 backdrop-blur-2xl border-l border-slate-200/80 dark:border-slate-800/80 text-slate-900 dark:text-slate-100 shadow-2xl flex flex-col animate-slide-left">
       
-      {/* Header Copiloto Minimalista */}
-      <div className="p-3.5 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/80">
+      {/* Header Copiloto */}
+      <div className="p-3.5 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
             <Bot className="w-4 h-4 animate-pulse" />
           </div>
           <div>
-            <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+            <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
               <span>Copiloto IA</span>
-              <span className="text-[9px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 px-1.5 rounded-full font-bold">
+              <span className="text-[9px] bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-1.5 rounded-full font-bold">
                 PRO
               </span>
             </h3>
-            <p className="text-[9px] text-slate-400">Itinerarios con gemas locales</p>
+            <p className="text-[9px] text-slate-500 dark:text-slate-400">Itinerarios con gemas locales</p>
           </div>
         </div>
 
         <button
-          onClick={handleCloseDrawer}
-          className="p-1.5 rounded-full bg-slate-800/80 text-slate-400 hover:text-white transition-colors"
+          onClick={onClose}
+          className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -175,13 +165,12 @@ export default function AICopilotDrawer({
       {/* Cuerpo Principal */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
         
-        {/* Prompts Rápidos */}
         {!itineraryResult && !isLoading && (
           <div className="space-y-3 my-auto py-6">
             <div className="text-center space-y-1">
-              <Sparkles className="w-6 h-6 text-emerald-400 mx-auto animate-bounce" />
-              <h4 className="text-sm font-bold text-white">¿A dónde querés viajar hoy?</h4>
-              <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+              <Sparkles className="w-6 h-6 text-emerald-600 dark:text-emerald-400 mx-auto animate-bounce" />
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">¿A dónde querés viajar hoy?</h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
                 Ingresá tu destino o elegí una sugerencia.
               </p>
             </div>
@@ -199,56 +188,52 @@ export default function AICopilotDrawer({
                     setPromptInput(suggestion);
                     generateItinerary(suggestion);
                   }}
-                  className="w-full text-left p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-emerald-500/40 text-[11px] text-slate-300 hover:text-white transition-all flex items-center justify-between group"
+                  className="w-full text-left p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-500/50 text-[11px] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all flex items-center justify-between group"
                 >
-                  <span>"{suggestion}"</span>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+                  <span className="font-medium">"{suggestion}"</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Carga */}
         {isLoading && (
           <div className="py-16 text-center space-y-3">
-            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mx-auto" />
+            <Loader2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400 animate-spin mx-auto" />
             <div className="space-y-1">
-              <p className="text-xs font-bold text-white">Generando itinerario...</p>
-              <p className="text-[10px] text-slate-400">Analizando gemas locales en Costa Rica</p>
+              <p className="text-xs font-bold text-slate-900 dark:text-white">Generando itinerario...</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">Analizando gemas locales en Costa Rica</p>
             </div>
           </div>
         )}
 
-        {/* Resultado */}
         {itineraryResult && !isLoading && (
           <div className="space-y-4 animate-fade-in">
             
-            {/* Banner Resumen */}
-            <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800/90 space-y-2 shadow-xl">
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/90 space-y-2 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="text-[9px] uppercase font-bold tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                  <span className="text-[9px] uppercase font-bold tracking-wider text-emerald-800 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full">
                     {itineraryResult.destination || 'Costa Rica'}
                   </span>
-                  <h4 className="text-sm font-extrabold text-white mt-1">
+                  <h4 className="text-sm font-extrabold text-slate-900 dark:text-white mt-1">
                     {itineraryResult.title}
                   </h4>
                 </div>
-                <span className="text-[10px] font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
+                <span className="text-[10px] font-semibold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md whitespace-nowrap">
                   {itineraryResult.estimated_budget || 'Presupuesto Medio'}
                 </span>
               </div>
 
-              <p className="text-[11px] text-slate-300 leading-snug">
+              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
                 {itineraryResult.summary}
               </p>
 
-              {/* Botones de Acción: Exportar PDF & Limpiar Ruta */}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
                   onClick={handleExportPDF}
-                  className="py-1.5 px-2.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] transition-all flex items-center justify-center gap-1.5"
+                  className="py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition-all flex items-center justify-center gap-1.5 shadow-sm"
                 >
                   <FileDown className="w-3.5 h-3.5" />
                   <span>Exportar PDF</span>
@@ -260,40 +245,39 @@ export default function AICopilotDrawer({
                       onClearRoute();
                       setRouteSpots([]);
                     }}
-                    className="py-1.5 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] transition-all flex items-center justify-center gap-1.5"
+                    className="py-1.5 px-2.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[10px] transition-all flex items-center justify-center gap-1.5"
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                     <span>Limpiar Ruta</span>
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Cronograma */}
             <div className="space-y-3">
               {itineraryResult.days?.map((dayObj: any, dayIdx: number) => (
                 <div key={dayIdx} className="space-y-2">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-400 border-b border-slate-800/80 pb-1">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 border-b border-slate-200/80 dark:border-slate-800/80 pb-1">
                     <Calendar className="w-3.5 h-3.5" />
                     <span>{dayObj.title || `Día ${dayObj.day}`}</span>
                   </div>
 
-                  <div className="space-y-1.5 pl-2 border-l-2 border-emerald-500/30">
+                  <div className="space-y-1.5 pl-2 border-l-2 border-emerald-500/40">
                     {dayObj.activities?.map((act: any, actIdx: number) => (
                       <div
                         key={actIdx}
-                        className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/60 space-y-0.5"
+                        className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/60 space-y-0.5"
                       >
                         <div className="flex items-center justify-between text-[10px]">
-                          <span className="font-bold text-emerald-400 flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-cyan-400" />
+                          <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-emerald-600" />
                             {act.time}
                           </span>
-                          <span className="text-slate-300 font-semibold truncate max-w-[180px]">
+                          <span className="text-slate-800 dark:text-slate-200 font-semibold truncate max-w-[180px]">
                             {act.activity}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-300 leading-snug">
+                        <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
                           {act.description}
                         </p>
                       </div>
@@ -309,19 +293,19 @@ export default function AICopilotDrawer({
       </div>
 
       {/* Input Flotante */}
-      <div className="p-2.5 border-t border-slate-800/80 bg-slate-950/90">
-        <form onSubmit={handleSubmit} className="flex items-center gap-1.5">
+      <div className="p-2.5 border-t border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
+        <form onSubmit={(e) => { e.preventDefault(); generateItinerary(promptInput); }} className="flex items-center gap-1.5">
           <input
             type="text"
             placeholder="Ajustar consulta..."
             value={promptInput}
             onChange={(e) => setPromptInput(e.target.value)}
-            className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-emerald-500 focus:outline-none text-[11px] text-white placeholder-slate-500"
+            className="flex-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 focus:outline-none text-[11px] text-slate-900 dark:text-white placeholder-slate-400"
           />
           <button
             type="submit"
             disabled={isLoading || !promptInput.trim()}
-            className="p-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold disabled:opacity-50 transition-colors shadow-md"
+            className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold disabled:opacity-50 transition-colors shadow-sm"
           >
             <Send className="w-3.5 h-3.5" />
           </button>
