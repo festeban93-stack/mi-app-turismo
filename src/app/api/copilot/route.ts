@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-function normalize(str: string = ''): string {
-  return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+function cleanText(str: string = ''): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
 }
 
 export async function POST(req: NextRequest) {
@@ -13,117 +17,120 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'El prompt es requerido.' }, { status: 400 });
     }
 
-    // 1. Consultar Gemas Reales de Supabase
+    // 1. Cargar todas las gemas desde Supabase
     const { data: allSpots, error: spotsError } = await supabase
       .from('spots')
       .select('id, title, description, category, latitude, longitude, address_text, entry_fee, opening_hours');
 
-    if (spotsError) {
-      console.error('Error al consultar gemas en Supabase:', spotsError);
-    }
+    if (spotsError) console.error('Error consultando Supabase:', spotsError);
 
-    const spotsList = allSpots || [];
+    const spotsList = (allSpots || []).filter(s => s.latitude && s.longitude);
+    const cleanPrompt = cleanText(prompt);
 
-    // 2. Extracción de Palabras Clave del Prompt
-    const cleanPrompt = normalize(prompt);
+    // 2. Extracción de palabras clave descartando conectores
     const keywords = cleanPrompt
       .split(/\s+/)
-      .filter(w => w.length > 3 && !['quiero', 'ruta', 'cerca', 'donde', 'para', 'como', 'hacer'].includes(w));
+      .filter(w => w.length > 2 && !['quiero', 'ruta', 'cerca', 'donde', 'para', 'como', 'hacer', 'unas', 'unos', 'esta', 'este'].includes(w));
 
-    // Filtrar gemas por coincidencia de palabras clave (Lugar, Categoría, Descripción)
-    let matchedSpots = spotsList.filter(spot => {
-      const titleNorm = normalize(spot.title);
-      const addressNorm = normalize(spot.address_text);
-      const descNorm = normalize(spot.description);
-      const catNorm = normalize(spot.category);
+    // 3. Sistema de Puntaje de Relevancia (Scoring)
+    const scoredSpots = spotsList.map(spot => {
+      const titleNorm = cleanText(spot.title);
+      const addressNorm = cleanText(spot.address_text);
+      const descNorm = cleanText(spot.description);
+      const catNorm = cleanText(spot.category);
 
-      return keywords.some(kw => 
-        titleNorm.includes(kw) || 
-        addressNorm.includes(kw) || 
-        descNorm.includes(kw) || 
-        catNorm.includes(kw)
-      );
+      let score = 0;
+
+      keywords.forEach(kw => {
+        if (titleNorm.includes(kw)) score += 10;
+        if (addressNorm.includes(kw)) score += 8;
+        if (descNorm.includes(kw)) score += 4;
+        if (catNorm.includes(kw)) score += 5;
+      });
+
+      return { spot, score };
     });
 
-    // Si no hay coincidencias exactas por palabra clave, sugerir gemas por zona/categoría general
+    // Ordenar por relevancia
+    scoredSpots.sort((a, b) => b.score - a.score);
+
+    // Seleccionar entre 3 y 5 gemas relevantes
+    let matchedSpots = scoredSpots.filter(s => s.score > 0).map(s => s.spot);
+
+    // Si no hay coincidencia exacta con palabras clave, seleccionar por categoría o muestra aleatoria para no dejar vacíos
     if (matchedSpots.length === 0) {
-      if (cleanPrompt.includes('sarchi') || cleanPrompt.includes('bajos del toro') || cleanPrompt.includes('valverde')) {
-        matchedSpots = spotsList.filter(s => normalize(s.address_text).includes('sarchi') || normalize(s.title).includes('silencio') || normalize(s.title).includes('catarata'));
+      if (cleanPrompt.includes('cafe') || cleanPrompt.includes('comida') || cleanPrompt.includes('restaurante')) {
+        matchedSpots = spotsList.filter(s => s.category === 'gastronomia').slice(0, 4);
+      } else if (cleanPrompt.includes('catarata') || cleanPrompt.includes('mirador') || cleanPrompt.includes('playa')) {
+        matchedSpots = spotsList.filter(s => s.category === 'naturaleza').slice(0, 4);
       } else {
         matchedSpots = spotsList.slice(0, 4);
       }
+    } else {
+      matchedSpots = matchedSpots.slice(0, 5);
     }
 
-    // 3. Si hay OpenAI API Key configurada, llamar a GPT-4o-mini
+    // 4. Si hay API Key de OpenAI, generar respuesta natural conversacional
     if (process.env.OPENAI_API_KEY) {
-      const spotsContext = spotsList.map(s => `- ID: ${s.id} | Nombre: "${s.title}" | Cat: ${s.category} | Ubicación: ${s.address_text}`).join('\n');
+      const spotsContext = matchedSpots.map(s => `- ID: ${s.id} | Nombre: "${s.title}" | Dirección: ${s.address_text}`).join('\n');
 
       const systemInstruction = `
-Eres el Copiloto Turístico de MapAI, un Guía Experto de Costa Rica.
-Gemas reales disponibles:
+Eres el Copiloto Turístico de MapAI Costa Rica.
+Has seleccionado las siguientes gemas de la base de datos para la consulta del usuario:
 ${spotsContext}
 
-Reglas:
-1. Responde de forma amable y concisa como un guía local tico.
-2. Si el usuario pide un cambio o ajuste, analiza el historial recibido y actualiza la lista.
-3. Devuelve ÚNICAMENTE formato JSON estricto:
+Responde de forma amable, clara y directa (estilo costarricense). Explica brevemente la ruta recomendada.
+Devuelve ÚNICAMENTE este formato JSON estricto:
 {
-  "reply": "Tu explicación en español...",
-  "suggestedSpotIds": ["id1", "id2"]
+  "reply": "Tu mensaje explicativo..."
 }`;
 
-      const openAiMessages = [
-        { role: 'system', content: systemInstruction },
-        ...history.map((h: any) => ({ role: h.role === 'user' ? 'user' : 'assistant', content: h.content })),
-        { role: 'user', content: prompt }
-      ];
-
-      const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: openAiMessages,
-          temperature: 0.7,
-          response_format: { type: 'json_object' }
-        })
-      });
-
-      const aiData = await aiRes.json();
-      const rawContent = aiData.choices?.[0]?.message?.content;
-
-      if (rawContent) {
-        const parsed = JSON.parse(rawContent);
-        const suggestedSpots = spotsList.filter(s => (parsed.suggestedSpotIds || []).includes(s.id));
-        return NextResponse.json({
-          reply: parsed.reply,
-          suggestedSpots: suggestedSpots.length > 0 ? suggestedSpots : matchedSpots.slice(0, 4)
+      try {
+        const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemInstruction },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.7,
+            response_format: { type: 'json_object' }
+          })
         });
+
+        const aiData = await aiRes.json();
+        const rawContent = aiData.choices?.[0]?.message?.content;
+
+        if (rawContent) {
+          const parsed = JSON.parse(rawContent);
+          return NextResponse.json({
+            reply: parsed.reply,
+            suggestedSpots: matchedSpots
+          });
+        }
+      } catch (e) {
+        console.error('Fallback por error en OpenAI API:', e);
       }
     }
 
-    // 4. SMART RAG FALLBACK (Cuando no hay API Key activa o durante pruebas locales)
-    const spotNames = matchedSpots.slice(0, 4).map(s => `• ${s.title} (${s.address_text || 'Costa Rica'})`).join('\n');
-
-    let replyText = '';
-    if (matchedSpots.length > 0) {
-      replyText = `¡Encontré estas gemas perfectas para tu consulta sobre "${prompt}":\n\n${spotNames}\n\nLas podés ver marcadas y trazadas directamente en el mapa interactivo.`;
-    } else {
-      replyText = `No encontré gemas con ese término exacto, pero te he trazado las mejores opciones cercanas en el mapa para explorar.`;
-    }
+    // 5. Respuesta directa estructurada
+    const spotListFormatted = matchedSpots.map((s, i) => `${i + 1}. ${s.title} (${s.address_text})`).join('\n');
+    const replyText = `¡Te preparé esta ruta optimizada con gemas en Costa Rica:\n\n${spotListFormatted}\n\nLos puntos están trazados y numerados en el mapa.`;
 
     return NextResponse.json({
       reply: replyText,
-      suggestedSpots: matchedSpots.slice(0, 4)
+      suggestedSpots: matchedSpots
     });
 
   } catch (error: any) {
     console.error('Error en /api/copilot:', error);
     return NextResponse.json(
-      { error: 'Error interno en el Copiloto.', details: error?.message },
+      { error: 'Error en el servidor.', details: error?.message },
       { status: 500 }
     );
   }
