@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   MapPin, 
@@ -14,7 +14,8 @@ import {
   Mountain,
   Waves,
   Camera,
-  Upload
+  Image as ImageIcon,
+  Trash2
 } from 'lucide-react';
 
 interface AddSpotModalProps {
@@ -29,8 +30,17 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
   const [description, setDescription] = useState('');
   const [addressText, setAddressText] = useState('');
   const [nickname, setNickname] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
 
+  // Estados de Imagen
+  const [imageUrl, setImageUrl] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  // Referencias a inputs de archivos ocultos
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  // Estados de GPS
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
@@ -49,7 +59,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
 
   const fetchGPSLocation = () => {
     if (!navigator.geolocation) {
-      setLocationError('Tu navegador no soporta geolocalización GPS.');
+      setLocationError('Tu dispositivo no soporta geolocalización GPS.');
       return;
     }
 
@@ -64,12 +74,46 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
       },
       (error) => {
         setIsGettingLocation(false);
-        setLocationError('No se pudo obtener la ubicación GPS automática.');
+        setLocationError('No se pudo obtener la ubicación GPS exacta.');
         setLatitude(9.9281);
         setLongitude(-84.0907);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Mostrar vista previa local instantánea
+    const localPreviewUrl = URL.createObjectURL(file);
+    setImagePreview(localPreviewUrl);
+    setIsUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.imageUrl) {
+        setImageUrl(data.imageUrl);
+      } else {
+        alert(`Error subiendo imagen: ${data.error || 'Falló la carga'}`);
+        setImagePreview(null);
+      }
+    } catch (err: any) {
+      alert(`Error al subir imagen: ${err?.message}`);
+      setImagePreview(null);
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const resetForm = () => {
@@ -79,6 +123,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
     setAddressText('');
     setNickname('');
     setImageUrl('');
+    setImagePreview(null);
     setLatitude(null);
     setLongitude(null);
     setRewardData(null);
@@ -126,6 +171,26 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+      
+      {/* Inputs de Archivo Ocultos */}
+      {/* 1. Abrir Cámara directamente */}
+      <input
+        type="file"
+        ref={cameraInputRef}
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      {/* 2. Abrir Galería de Fotos */}
+      <input
+        type="file"
+        ref={galleryInputRef}
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
       <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden text-slate-100 max-h-[90vh] flex flex-col">
         
         {/* Header Modal */}
@@ -136,7 +201,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
             </div>
             <div>
               <h3 className="text-base font-bold text-white leading-tight">Reportar Gema Oculta</h3>
-              <p className="text-[11px] text-slate-400">Verificación con evidencia fotográfica</p>
+              <p className="text-[11px] text-slate-400">Verificación con fotografía real</p>
             </div>
           </div>
           <button
@@ -151,7 +216,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
         <div className="p-5 overflow-y-auto space-y-4 custom-scrollbar">
           
           {rewardData ? (
-            /* Pantalla de Éxito */
+            /* Pantalla de Éxito / Gamificación */
             <div className="py-6 text-center space-y-4 animate-scale-up">
               <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg">
                 <CheckCircle2 className="w-10 h-10 animate-bounce" />
@@ -160,14 +225,14 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
               <div className="space-y-1">
                 <h4 className="text-xl font-black text-white">¡Gema Enviada a Verificación!</h4>
                 <p className="text-xs text-slate-300">
-                  Gracias <span className="font-bold text-cyan-400">{rewardData.spot?.explorer_nickname}</span>. La foto de evidencia está en proceso de revisión por el equipo de curadores.
+                  Gracias <span className="font-bold text-cyan-400">{rewardData.spot?.explorer_nickname}</span>. La foto de evidencia está en revisión por el equipo de curadores.
                 </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/80 space-y-2 max-w-xs mx-auto shadow-inner">
                 <div className="flex items-center justify-center gap-2 text-emerald-400 text-xs font-extrabold">
                   <Award className="w-4 h-4" />
-                  <span>+50 Pts en espera de aprobación</span>
+                  <span>+50 Pts acreditados tras aprobación</span>
                 </div>
               </div>
 
@@ -191,7 +256,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                     <p className="text-[10px] text-slate-400">
                       {isGettingLocation ? (
                         <span className="inline-flex items-center gap-1 text-cyan-400">
-                          <Loader2 className="w-3 h-3 animate-spin" /> Capturando coordenadas GPS...
+                          <Loader2 className="w-3 h-3 animate-spin" /> Detección GPS activa...
                         </span>
                       ) : latitude && longitude ? (
                         <span className="text-emerald-400 font-mono">
@@ -215,39 +280,83 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                 </button>
               </div>
 
-              {/* Título */}
+              {/* MÓDULO DE FOTOGRAFÍA: CÁMARA O GALERÍA */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                  <span>Foto del Lugar (Evidencia) *</span>
+                  {imageUrl && <span className="text-[10px] text-emerald-400 font-bold">✓ Subida con éxito</span>}
+                </label>
+
+                {imagePreview ? (
+                  /* Vista Previa de la Foto */
+                  <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-slate-700 group bg-slate-950">
+                    <img
+                      src={imagePreview}
+                      alt="Vista previa"
+                      className="w-full h-full object-cover"
+                    />
+                    {isUploadingImage && (
+                      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center text-xs text-cyan-400 font-bold gap-2">
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                        <span>Subiendo a la nube...</span>
+                      </div>
+                    )}
+                    {!isUploadingImage && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImagePreview(null);
+                          setImageUrl('');
+                        }}
+                        className="absolute top-3 right-3 p-2 rounded-full bg-slate-950/80 text-rose-400 hover:text-rose-300 border border-slate-800 backdrop-blur-md transition-all shadow-lg"
+                        title="Eliminar foto"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  /* Botones para seleccionar Cámara o Galería */
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 hover:bg-slate-800/60 hover:border-cyan-500/50 text-slate-300 hover:text-white transition-all group"
+                    >
+                      <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform">
+                        <Camera className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs font-semibold">Tomar Foto (Cámara)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 hover:bg-slate-800/60 hover:border-emerald-500/50 text-slate-300 hover:text-white transition-all group"
+                    >
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
+                        <ImageIcon className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs font-semibold">Elegir de Galería</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Nombre de la Gema */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-300">Nombre de la Gema Oculta *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej: Mirador Valle del Sol"
+                  placeholder="Ej: Mirador Valle del Sol, Soda Doña Rosa..."
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:outline-none text-xs text-white"
                 />
               </div>
 
-              {/* Fotografía de Evidencia */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Camera className="w-4 h-4 text-cyan-400" />
-                  Fotografía del Lugar (Evidencia) *
-                </label>
-                <input
-                  type="url"
-                  required
-                  placeholder="Pegá la URL de la foto o imagen (https://...)"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:outline-none text-xs text-white placeholder-slate-500"
-                />
-                <p className="text-[10px] text-slate-500">
-                  Subí una foto clara de la entrada, rótulo o vista principal para que los curadores la verifiquen.
-                </p>
-              </div>
-
-              {/* Categorías */}
+              {/* Categorías Selector */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-300">Categoría</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -277,13 +386,13 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                 </div>
               </div>
 
-              {/* Descripción y Nickname */}
+              {/* Cantón y Apodo */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-300">Cantón / Zona</label>
                   <input
                     type="text"
-                    placeholder="Ej: Bajos de Toro"
+                    placeholder="Ej: Bajos de Toro, Sarchí"
                     value={addressText}
                     onChange={(e) => setAddressText(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white"
@@ -301,10 +410,18 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                 </div>
               </div>
 
-              {/* Botón */}
+              {/* Banner Gamificado */}
+              <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-950/50 to-cyan-950/50 border border-emerald-500/30 flex items-center gap-2.5">
+                <Sparkles className="w-5 h-5 text-emerald-400 flex-shrink-0 animate-bounce" />
+                <p className="text-[11px] text-slate-300 leading-snug">
+                  Ganarás <strong className="text-emerald-400">+50 Pts</strong> y la insignia <strong className="text-cyan-400">Pionero Local</strong> cuando la foto sea verificada.
+                </p>
+              </div>
+
+              {/* Botón de Envío */}
               <button
                 type="submit"
-                disabled={isSubmitting || !title || !imageUrl}
+                disabled={isSubmitting || isUploadingImage || !title || !imageUrl}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold text-xs shadow-lg hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
@@ -313,7 +430,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                     <span>Enviando para moderación...</span>
                   </>
                 ) : (
-                  <span>🔒 Enviar a Verificación con Foto</span>
+                  <span>🔒 Enviar a Verificación (+50 Pts)</span>
                 )}
               </button>
             </form>
