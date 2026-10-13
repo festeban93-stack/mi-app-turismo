@@ -1,134 +1,230 @@
-﻿'use client';
+'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { X, Store, Send, CheckCircle2, Building2, Phone, FileText, Loader2 } from 'lucide-react';
 
 interface ClaimBusinessModalProps {
   isOpen: boolean;
   onClose: () => void;
-  placeName: string;
-  placeId: string;
+  currentUser: any;
+  availableSpots?: any[];
 }
 
-export default function ClaimBusinessModal({ isOpen, onClose, placeName, placeId }: ClaimBusinessModalProps) {
-  const [ownerName, setOwnerName] = useState('');
-  const [email, setEmail] = useState('');
+export default function ClaimBusinessModal({
+  isOpen,
+  onClose,
+  currentUser,
+  availableSpots = []
+}: ClaimBusinessModalProps) {
+  const [selectedSpotId, setSelectedSpotId] = useState<string>('');
+  const [customBusinessName, setCustomBusinessName] = useState('');
   const [phone, setPhone] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [taxId, setTaxId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+  if (!isOpen || !currentUser) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
+    if (!phone.trim()) {
+      setErrorMsg('Por favor ingresá un número de WhatsApp o teléfono de contacto.');
+      return;
+    }
+
+    const spotObj = availableSpots.find(s => s.id === selectedSpotId);
+    const finalBusinessName = spotObj ? spotObj.title : customBusinessName;
+
+    if (!finalBusinessName.trim()) {
+      setErrorMsg('Por favor seleccioná un comercio existente o ingresá el nombre de tu local.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg(null);
 
     try {
-      const res = await fetch('/api/places/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          place_id: placeId,
-          owner_name: ownerName,
-          owner_email: email,
-          owner_phone: phone
-        })
-      });
+      const { error } = await supabase.from('business_claims').insert([
+        {
+          user_id: currentUser.id,
+          spot_id: selectedSpotId || null,
+          business_name: finalBusinessName,
+          contact_phone: phone,
+          contact_email: currentUser.email,
+          tax_id_or_identification: taxId,
+          additional_notes: notes,
+          status: 'pending'
+        }
+      ]);
 
-      const data = await res.json();
-      if (data.success) {
-        setSubmitted(true);
-      }
-    } catch (err) {
-      alert('Error enviando la solicitud. Intenta de nuevo.');
+      if (error) throw error;
+
+      setSuccess(true);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Error al enviar la solicitud.');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
+  const handleResetAndClose = () => {
+    setSuccess(false);
+    setErrorMsg(null);
+    setSelectedSpotId('');
+    setCustomBusinessName('');
+    setPhone('');
+    setTaxId('');
+    setNotes('');
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-      <div className="bg-slate-900 border border-amber-500/40 w-full max-w-md rounded-2xl p-5 shadow-2xl flex flex-col gap-4 text-white font-sans">
-        <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-          <h2 className="font-bold text-base text-amber-400 flex items-center gap-2">
-            🏆 Reclamar "{placeName}"
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white font-bold text-lg">✕</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in select-none">
+      <div className="relative w-full max-w-md bg-white dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden text-slate-900 dark:text-slate-100 p-5 space-y-4">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <Store className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                Reclamar mi Comercio B2B
+              </h3>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">Verificación Oficial en MapAI</p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleResetAndClose}
+            className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {submitted ? (
-          <div className="flex flex-col items-center text-center gap-3 py-6">
-            <span className="text-4xl">🎉</span>
-            <h3 className="font-bold text-emerald-400 text-sm">¡Solicitud B2B Enviada!</h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Verificaremos tu relación con <strong className="text-white">{placeName}</strong> y te daremos acceso al Panel de Administración B2B para personalizar menú, precios y publicar ofertas destacadas.
+        {success ? (
+          <div className="py-8 text-center space-y-3">
+            <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto animate-bounce" />
+            <h4 className="text-base font-extrabold text-slate-900 dark:text-white">
+              ¡Solicitud Recibida!
+            </h4>
+            <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xs mx-auto leading-relaxed">
+              Nuestro equipo revisará la información de tu comercio y te contactaremos por WhatsApp o correo en menos de 24 horas para verificar tu perfil B2B.
             </p>
             <button
-              onClick={onClose}
-              className="mt-2 bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-2 rounded-lg text-xs"
+              onClick={handleResetAndClose}
+              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all"
             >
-              Cerrar
+              Entendido
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3 text-xs">
-            <p className="text-slate-300 text-[11px] leading-relaxed bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
-              ¿Eres el dueño o administrador de este establecimiento? Reclama tu perfil para responder opiniones, actualizar tu WhatsApp directo y activar el **Pin Promocional**.
-            </p>
+          <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+            {errorMsg && (
+              <p className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 text-rose-600 dark:text-rose-400 text-[10px] font-medium">
+                ⚠️ {errorMsg}
+              </p>
+            )}
 
-            <div>
-              <label className="font-semibold text-slate-300 block mb-1">Nombre Completo del Responsable *</label>
-              <input
-                type="text"
-                required
-                placeholder="Ej: Carlos Valverde"
-                value={ownerName}
-                onChange={(e) => setOwnerName(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 outline-none focus:border-amber-500 text-white"
-              />
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>¿Cuál es tu negocio?</span>
+              </label>
+
+              {availableSpots.length > 0 && (
+                <select
+                  value={selectedSpotId}
+                  onChange={(e) => setSelectedSpotId(e.target.value)}
+                  className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none mb-1.5"
+                >
+                  <option value="">-- Seleccionar gema existente en el mapa --</option>
+                  {availableSpots.map((spot) => (
+                    <option key={spot.id} value={spot.id}>
+                      {spot.title} ({spot.address_text || 'Costa Rica'})
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {!selectedSpotId && (
+                <input
+                  type="text"
+                  placeholder="O escribí el nombre de tu local/tour..."
+                  value={customBusinessName}
+                  onChange={(e) => setCustomBusinessName(e.target.value)}
+                  className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
+                />
+              )}
             </div>
 
-            <div>
-              <label className="font-semibold text-slate-300 block mb-1">Correo Electrónico de Contacto *</label>
-              <input
-                type="email"
-                required
-                placeholder="ejemplo@comercio.cr"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 outline-none focus:border-amber-500 text-white"
-              />
-            </div>
-
-            <div>
-              <label className="font-semibold text-slate-300 block mb-1">Teléfono / WhatsApp de Negocio *</label>
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                <span>WhatsApp de Contacto Directo</span>
+              </label>
               <input
                 type="tel"
                 required
                 placeholder="+506 8888-8888"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 outline-none focus:border-amber-500 text-white"
+                className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
               />
             </div>
 
-            <div className="flex gap-2 justify-end mt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg font-semibold text-slate-300"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-lg transition-colors"
-              >
-                {submitting ? 'Enviando...' : 'Verificar Negocio'}
-              </button>
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Cédula Jurídica o Física (Opcional)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="N° de Identificación tributaria"
+                value={taxId}
+                onChange={(e) => setTaxId(e.target.value)}
+                className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
+              />
             </div>
+
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-700 dark:text-slate-300">
+                Detalles Adicionales (Menú, Horarios, Sitio Web)
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Agregá cualquier información para verificar la propiedad del comercio..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none resize-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Enviando Solicitud...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  <span>Enviar Solicitud de Verificación</span>
+                </>
+              )}
+            </button>
           </form>
         )}
+
       </div>
     </div>
   );

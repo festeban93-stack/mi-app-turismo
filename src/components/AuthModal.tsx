@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { X, Sparkles, LogIn, Mail, Lock, CheckCircle2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { X, Sparkles, LogIn, Mail, Lock } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -19,22 +19,22 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
 
   if (!isOpen) return null;
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  );
-
   const handleOAuthLogin = async (provider: 'google') => {
     setLoading(true);
     setErrorMsg(null);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}`,
-      },
-    });
-    if (error) setErrorMsg(error.message);
-    setLoading(false);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}`,
+        },
+      });
+      if (error) setErrorMsg(error.message);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Error al conectar con Google');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -44,31 +44,36 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
     setLoading(true);
     setErrorMsg(null);
 
-    if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (error) {
-        setErrorMsg(error.message);
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) {
+          setErrorMsg(error.message);
+        } else {
+          alert('¡Cuenta creada con éxito! Ya podés continuar.');
+          if (onSuccess) onSuccess();
+          onClose();
+        }
       } else {
-        alert('¡Cuenta creada con éxito! Ya podés continuar.');
-        if (onSuccess) onSuccess();
-        onClose();
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) {
+          setErrorMsg(error.message);
+        } else {
+          if (onSuccess) onSuccess();
+          onClose();
+        }
       }
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) {
-        setErrorMsg(error.message);
-      } else {
-        if (onSuccess) onSuccess();
-        onClose();
-      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Error de autenticación');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -166,7 +171,6 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
           </button>
         </form>
 
-        {/* Toggle Login / Registro */}
         <div className="text-center pt-1">
           <button
             type="button"
