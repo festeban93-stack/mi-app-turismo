@@ -3,11 +3,19 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
+function normalizeText(text: string = ''): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
 export async function POST(request: Request) {
   try {
-    const { prompt, destination } = await request.json();
+    const { prompt } = await request.json();
 
-    if (!prompt) {
+    if (!prompt || !prompt.trim()) {
       return NextResponse.json({ success: false, error: 'El prompt es obligatorio.' }, { status: 400 });
     }
 
@@ -19,138 +27,190 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Configuración de base de datos no disponible.' }, { status: 500 });
     }
 
-    // 1. Obtener spots de la base de datos para contextualizar la IA con gemas reales
     const supabase = createClient(supabaseUrl, serviceKey);
-    const { data: dbSpots } = await supabase
+
+    // 1. Extraer palabras clave geograficas del prompt
+    const promptNorm = normalizeText(prompt);
+    let destinationFilter = '';
+    
+    if (promptNorm.includes('fortuna') || promptNorm.includes('arenal') || promptNorm.includes('san carlos')) {
+      destinationFilter = 'Fortuna';
+    } else if (promptNorm.includes('guanacaste') || promptNorm.includes('playa') || promptNorm.includes('tamarindo') || promptNorm.includes('papagayo')) {
+      destinationFilter = 'Guanacaste';
+    } else if (promptNorm.includes('cartago') || promptNorm.includes('irazu') || promptNorm.includes('orosi')) {
+      destinationFilter = 'Cartago';
+    } else if (promptNorm.includes('san jose') || promptNorm.includes('chepe')) {
+      destinationFilter = 'San José';
+    } else if (promptNorm.includes('limon') || promptNorm.includes('puerto viejo') || promptNorm.includes('caribe')) {
+      destinationFilter = 'Limón';
+    }
+
+    // 2. Consultar spots reales filtrados por zona
+    let dbQuery = supabase
       .from('spots')
-      .select('id, title, category, description, address_text, latitude, longitude')
-      .limit(60);
+      .select('id, title, category, description, address_text, latitude, longitude');
 
-    const availableSpotsContext = (dbSpots || []).map(s => `- [ID: ${s.id}] ${s.title} (${s.category}): ${s.address_text}. ${s.description?.substring(0, 100)}`).join('\n');
+    if (destinationFilter) {
+      dbQuery = dbQuery.or(`title.ilike.%${destinationFilter}%,address_text.ilike.%${destinationFilter}%,description.ilike.%${destinationFilter}%`);
+    }
 
-    // 2. Prompt del sistema para Gemini
-    const systemInstruction = `
+    const { data: matchedSpots } = await dbQuery.limit(30);
+
+    // Fallback de spots generales si la consulta especifica devuelve pocos registros
+    let spotsToUse = matchedSpots || [];
+    if (spotsToUse.length < 3) {
+      const { data: allSpots } = await supabase
+        .from('spots')
+        .select('id, title, category, description, address_text, latitude, longitude')
+        .limit(20);
+      spotsToUse = allSpots || [];
+    }
+
+    // Parsear coordenadas para asegurar que el mapa las pueda dibujar
+    spotsToUse = spotsToUse.map(s => {
+      let lat = parseFloat(s.latitude);
+      let lng = parseFloat(s.longitude);
+      if ((isNaN(lat) || isNaN(lng)) && s.location) {
+        const match = String(s.location).match(/POINT\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+        if (match) {
+          lng = parseFloat(match[1]);
+          lat = parseFloat(match[2]);
+        }
+      }
+      return { ...s, latitude: lat, longitude: lng };
+    }).filter(s => !isNaN(s.latitude) && !isNaN(s.longitude));
+
+    // 3. Preparar contexto para la IA
+    const availableSpotsContext = spotsToUse
+      .map(s => `- [ID: ${s.id}] ${s.title} (${s.category}): ${s.address_text || 'Costa Rica'}. ${s.description?.substring(0, 120)}`)
+      .join('\n');
+
+    let itineraryJson: any = null;
+
+    // 4. Intento con Gemini API
+    if (geminiApiKey) {
+      const systemInstruction = `
 Eres el Copiloto Experto en Turismo e Itinerarios de "MapAI Costa Rica".
-Tu objetivo es diseñar un itinerario detallado, realista y altamente atractivo basado en la consulta del usuario.
+Crea un itinerario personalizado en JSON estricto basado en la solicitud del usuario y las gemas reales disponibles.
 
-REGLAS DE RESPUESTA:
-1. Responde ÚNICAMENTE en formato JSON estricto sin markdown ni cercas de código.
-2. Usa esta estructura JSON exacta:
+REGLAS:
+1. Responde UNICAMENTE en formato JSON valido sin bloques markdown.
+2. Formato esperado:
 {
-  "title": "Título atractivo del itinerario",
-  "destination": "Zona principal de Costa Rica",
+  "title": "Nombre del itinerario",
+  "destination": "${destinationFilter || 'Costa Rica'}",
   "estimated_budget": "Económico | Medio | Alto",
-  "summary": "Resumen ejecutivo del viaje de 2 oraciones.",
+  "summary": "Resumen conciso del viaje",
   "days": [
     {
       "day": 1,
       "title": "Título del Día 1",
       "activities": [
         {
-          "time": "8:00 AM",
-          "activity": "Nombre de la actividad o gema",
-          "description": "Descripción práctica y recomendación local.",
-          "spot_id": "ID_SI_COINCIDE_CON_LA_LISTA_O_NULL"
+          "time": "8:30 AM",
+          "activity": "Nombre de la gema o lugar real",
+          "description": "Descripción práctica",
+          "spot_id": "ID_DE_LA_LISTA_O_NULL"
         }
       ]
     }
   ],
-  "recommended_spot_ids": ["array_de_ids_de_la_lista_proporcionada"]
+  "recommended_spot_ids": ["array_de_ids_utilizados"]
 }
 
-BASE DE DATOS DE GEMAS REALES DISPONIBLES EN COSTA RICA:
+GEMAS DISPONIBLES EN ESTA ZONA:
 ${availableSpotsContext}
 `;
 
-    // 3. Consulta a Gemini REST API
-    let itineraryJson = null;
+      const endpoints = [
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`
+      ];
 
-    if (geminiApiKey) {
-      try {
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
-          {
+      for (const endpoint of endpoints) {
+        try {
+          const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              contents: [
-                {
-                  role: 'user',
-                  parts: [{ text: `${systemInstruction}\n\nCONSULTA DEL USUARIO: "${prompt}"` }]
-                }
-              ],
-              generationConfig: {
-                responseMimeType: 'application/json',
-                temperature: 0.4,
-              }
+              contents: [{ role: 'user', parts: [{ text: `${systemInstruction}\n\nSOLICITUD: "${prompt}"` }] }],
+              generationConfig: { responseMimeType: 'application/json', temperature: 0.3 }
             })
-          }
-        );
+          });
 
-        const geminiData = await geminiRes.json();
-        const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (rawText) {
-          itineraryJson = JSON.parse(rawText);
+          if (res.ok) {
+            const data = await res.json();
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              itineraryJson = JSON.parse(text);
+              break;
+            }
+          }
+        } catch (e) {
+          console.warn('Error llamando Gemini:', e);
         }
-      } catch (e) {
-        console.warn('Error parseando respuesta de Gemini:', e);
       }
     }
 
-    // Fallback inteligente si la API no está configurada o falló
+    // 5. GENERADOR DINÁMICO DE FALLBACK (Basado en datos reales de Supabase)
     if (!itineraryJson) {
-      const sampleSpots = (dbSpots || []).slice(0, 4);
+      const selectedForRoute = spotsToUse.slice(0, 4);
+      const destName = destinationFilter || 'Costa Rica';
+
       itineraryJson = {
         title: `Ruta Especial: ${prompt}`,
-        destination: destination || 'Costa Rica',
+        destination: destName,
         estimated_budget: 'Presupuesto Medio',
-        summary: `Itinerario optimizado por MapAI con recomendaciones de gemas locales y paradas escénicas en ${destination || 'Costa Rica'}.`,
+        summary: `Itinerario de exploración local para ${destName} utilizando gemas reales geolocalizadas.`,
         days: [
           {
             day: 1,
-            title: 'Día 1: Inmersión y Naturaleza Local',
+            title: `Día 1: Exploración en ${destName}`,
             activities: [
               {
                 time: '8:30 AM',
-                activity: sampleSpots[0]?.title || 'Desayuno Típico y Salida',
-                description: sampleSpots[0]?.description || 'Disfrutá un gallo pinto tradicional con café chorreado.',
-                spot_id: sampleSpots[0]?.id || null
+                activity: selectedForRoute[0]?.title || `Desayuno y salida en ${destName}`,
+                description: selectedForRoute[0]?.description || `Punto de inicio en ${destName}.`,
+                spot_id: selectedForRoute[0]?.id || null
               },
               {
-                time: '1:00 PM',
-                activity: sampleSpots[1]?.title || 'Exploración de Sendero o Mirador',
-                description: sampleSpots[1]?.description || 'Recorrido por senderos naturales y miradores fotográficos.',
-                spot_id: sampleSpots[1]?.id || null
+                time: '1:30 PM',
+                activity: selectedForRoute[1]?.title || `Parada escénica en ${destName}`,
+                description: selectedForRoute[1]?.description || `Disfrutá del entorno natural y gastronomía local.`,
+                spot_id: selectedForRoute[1]?.id || null
               }
             ]
           },
           {
             day: 2,
-            title: 'Día 2: Gastronomía y Atardecer',
+            title: `Día 2: Atardeceres y Sabores Locales`,
             activities: [
               {
-                time: '11:30 AM',
-                activity: sampleSpots[2]?.title || 'Almuerzo Criollo en Soda Tradicional',
-                description: sampleSpots[2]?.description || 'Casados tradicionales y refrescos naturales de temporada.',
-                spot_id: sampleSpots[2]?.id || null
+                time: '11:00 AM',
+                activity: selectedForRoute[2]?.title || `Aventura y cultura local`,
+                description: selectedForRoute[2]?.description || `Experiencia recomendada en la zona.`,
+                spot_id: selectedForRoute[2]?.id || null
               },
               {
                 time: '4:30 PM',
-                activity: sampleSpots[3]?.title || 'Atardecer en Punto Panorámico',
-                description: sampleSpots[3]?.description || 'Punto estratégico para disfrutar la caída del sol con vista panorámica.',
-                spot_id: sampleSpots[3]?.id || null
+                activity: selectedForRoute[3]?.title || `Cierre de jornada con vista panorámica`,
+                description: selectedForRoute[3]?.description || `Punto estratégico para disfrutar el atardecer.`,
+                spot_id: selectedForRoute[3]?.id || null
               }
             ]
           }
         ],
-        recommended_spot_ids: sampleSpots.map(s => s.id)
+        recommended_spot_ids: selectedForRoute.map(s => s.id)
       };
     }
 
-    // Extraer los objetos completos de los spots recomendados
-    const routeSpots = (dbSpots || []).filter(s => 
-      itineraryJson.recommended_spot_ids?.includes(s.id)
-    );
+    // 6. Obtener los objetos completos de los spots para trazar en el mapa
+    const routeSpotIds = itineraryJson.recommended_spot_ids || [];
+    let routeSpots = spotsToUse.filter(s => routeSpotIds.includes(s.id));
+
+    if (routeSpots.length === 0 && spotsToUse.length > 0) {
+      routeSpots = spotsToUse.slice(0, 4);
+    }
 
     return NextResponse.json({
       success: true,
@@ -159,7 +219,7 @@ ${availableSpotsContext}
     }, { status: 200 });
 
   } catch (err: any) {
-    console.error('Error en copilot route:', err);
-    return NextResponse.json({ success: false, error: err?.message || 'Error en el servidor' }, { status: 500 });
+    console.error('Excepción en /api/copilot/itinerary:', err);
+    return NextResponse.json({ success: false, error: err?.message || 'Error de servidor' }, { status: 500 });
   }
 }

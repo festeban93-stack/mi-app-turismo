@@ -6,12 +6,9 @@ import {
   X, 
   Send, 
   Calendar, 
-  MapPin, 
   Clock, 
-  Compass, 
   Loader2, 
   Route, 
-  DollarSign,
   ChevronRight,
   Bot
 } from 'lucide-react';
@@ -59,7 +56,9 @@ export default function AICopilotDrawer({
       if (data.success) {
         setItineraryResult(data.itinerary);
         setRouteSpots(data.routeSpots || []);
-        if (onApplyRouteToMap && data.routeSpots) {
+        
+        // AUTO-APLICAR RUTA AL MAPA DE FORMA INMEDIATA
+        if (onApplyRouteToMap && data.routeSpots && data.routeSpots.length > 0) {
           onApplyRouteToMap(data.routeSpots);
         }
       } else {
@@ -110,7 +109,7 @@ export default function AICopilotDrawer({
       {/* Cuerpo Principal */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar">
         
-        {/* Prompts de Sugerencia Rápida */}
+        {/* Prompts Rápido */}
         {!itineraryResult && !isLoading && (
           <div className="space-y-3 my-auto py-6">
             <div className="text-center space-y-1">
@@ -124,8 +123,8 @@ export default function AICopilotDrawer({
             <div className="space-y-2 pt-2">
               {[
                 'Plan de fin de semana en La Fortuna para 2 personas',
-                'Ruta de 3 días por playas secretas de Guanacaste',
-                'Tour gastronómico de sodas tradicionales en Cartago',
+                'Mejores playas para atardeceres en Guanacaste',
+                'Sodas tradicionales imperdibles en Cartago',
                 'Escapada de aventura y senderos en Monteverde'
               ].map((suggestion, idx) => (
                 <button
@@ -144,18 +143,18 @@ export default function AICopilotDrawer({
           </div>
         )}
 
-        {/* Estado de Carga */}
+        {/* Carga */}
         {isLoading && (
           <div className="py-16 text-center space-y-3">
             <Loader2 className="w-10 h-10 text-cyan-400 animate-spin mx-auto" />
             <div className="space-y-1">
               <p className="text-sm font-bold text-white">Diseñando tu itinerario ideal...</p>
-              <p className="text-xs text-slate-400">Analizando gemas locales y tiempos de traslado en Costa Rica</p>
+              <p className="text-xs text-slate-400">Analizando gemas locales en Costa Rica</p>
             </div>
           </div>
         )}
 
-        {/* Resultado del Itinerario Generado */}
+        {/* Resultado */}
         {itineraryResult && !isLoading && (
           <div className="space-y-5 animate-fade-in">
             
@@ -185,12 +184,12 @@ export default function AICopilotDrawer({
                   className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-extrabold text-xs shadow-md hover:brightness-110 transition-all flex items-center justify-center gap-2"
                 >
                   <Route className="w-4 h-4" />
-                  <span>Ver Ruta Trazada en el Mapa ({routeSpots.length} Gemas)</span>
+                  <span>Re-centrar Ruta en el Mapa ({routeSpots.length} Gemas)</span>
                 </button>
               )}
             </div>
 
-            {/* Cronograma Día por Día */}
+            {/* Cronograma */}
             <div className="space-y-4">
               {itineraryResult.days?.map((dayObj: any, dayIdx: number) => (
                 <div key={dayIdx} className="space-y-2.5">
@@ -229,12 +228,12 @@ export default function AICopilotDrawer({
 
       </div>
 
-      {/* Input Flotante para Consultas */}
+      {/* Input Flotante */}
       <div className="p-3 border-t border-slate-800 bg-slate-950/90 backdrop-blur-md">
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <input
             type="text"
-            placeholder="Pregúntale a la IA (ej: 'Añadir sodas típicas en la ruta')..."
+            placeholder="Ajustá tu consulta (ej: 'Agregar sodas en la ruta')..."
             value={promptInput}
             onChange={(e) => setPromptInput(e.target.value)}
             className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-500 focus:outline-none text-xs text-white placeholder-slate-500"
