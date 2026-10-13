@@ -6,16 +6,16 @@ import {
   X, 
   Plus, 
   Search, 
-  MapPin, 
   Calendar, 
-  DollarSign, 
   UserPlus, 
   Trash2, 
   Sparkles, 
   Route, 
   CheckCircle2, 
   Loader2,
-  Users
+  Users,
+  MapPin,
+  Radio
 } from 'lucide-react';
 
 interface CustomTripModalProps {
@@ -27,6 +27,14 @@ interface CustomTripModalProps {
   onRequireAuth: () => void;
 }
 
+interface TripItem {
+  id?: string;
+  spot?: any;
+  custom_title?: string;
+  custom_address?: string;
+  day: number;
+}
+
 export default function CustomTripModal({
   isOpen,
   onClose,
@@ -35,18 +43,19 @@ export default function CustomTripModal({
   onApplyTripToMap,
   onRequireAuth
 }: CustomTripModalProps) {
-  // Estado de Creación de Viaje
   const [tripTitle, setTripTitle] = useState('');
   const [durationDays, setDurationDays] = useState(2);
-  const [budget, setBudget] = useState('Presupuesto Medio');
-  
-  // Búsqueda y Selección de Gemas
+  const [activeTripId, setActiveTripId] = useState<string | null>(null);
+
+  // Buscador y Paradas
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSpots, setSelectedSpots] = useState<{ spot: any; day: number }[]>([]);
-  
-  // Colaboradores
+  const [customPlaceName, setCustomPlaceName] = useState('');
+  const [selectedSpots, setSelectedSpots] = useState<TripItem[]>([]);
+
+  // Colaboración
   const [collaboratorEmail, setCollaboratorEmail] = useState('');
   const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
+  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -58,9 +67,49 @@ export default function CustomTripModal({
     }
   }, [currentUser, isOpen]);
 
+  // Escuchar cambios en Tiempo Real si hay un viaje activo cargado
+  useEffect(() => {
+    if (!activeTripId) return;
+
+    const channel = supabase
+      .channel(`trip_${activeTripId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'trip_spots', filter: `trip_id=eq.${activeTripId}` },
+        () => {
+          setIsRealtimeActive(true);
+          fetchTripSpotsRealtime(activeTripId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeTripId]);
+
+  const fetchTripSpotsRealtime = async (tripId: string) => {
+    const { data } = await supabase
+      .from('trip_spots')
+      .select('*, spots(*)')
+      .eq('trip_id', tripId)
+      .order('day_number', { ascending: true });
+
+    if (data) {
+      const items: TripItem[] = data.map(d => ({
+        id: d.id,
+        spot: d.spots,
+        custom_title: d.custom_title,
+        custom_address: d.custom_address,
+        day: d.day_number
+      }));
+      setSelectedSpots(items);
+    }
+  };
+
   if (!isOpen || !currentUser) return null;
 
-  // Filtrar gemas disponibles en tiempo real
+  // Filtrar gemas por búsqueda
   const filteredSpots = availableSpots.filter(s => {
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
@@ -71,13 +120,28 @@ export default function CustomTripModal({
     );
   });
 
+  // Agregar Gema Existente
   const handleAddSpotToTrip = (spot: any, day: number) => {
-    if (selectedSpots.some(item => item.spot.id === spot.id)) return;
+    if (selectedSpots.some(item => item.spot?.id === spot.id)) return;
     setSelectedSpots(prev => [...prev, { spot, day }]);
   };
 
-  const handleRemoveSpotFromTrip = (spotId: string) => {
-    setSelectedSpots(prev => prev.filter(item => item.spot.id !== spotId));
+  // Agregar Parada Personalizada (Sin foto ni registro público)
+  const handleAddCustomPlace = (day: number) => {
+    if (!customPlaceName.trim()) return;
+    setSelectedSpots(prev => [
+      ...prev,
+      {
+        custom_title: customPlaceName.trim(),
+        custom_address: 'Lugar personalizado',
+        day
+      }
+    ]);
+    setCustomPlaceName('');
+  };
+
+  const handleRemoveSpotFromTrip = (index: number) => {
+    setSelectedSpots(prev => prev.filter((_, idx) => idx !== index));
   };
 
   const handleAddCollaborator = () => {
@@ -97,7 +161,7 @@ export default function CustomTripModal({
       return;
     }
     if (selectedSpots.length === 0) {
-      alert('Agregá al menos una gema o lugar a tu ruta.');
+      alert('Agregá al menos un lugar o parada personalizada.');
       return;
     }
 
@@ -111,8 +175,7 @@ export default function CustomTripModal({
           {
             owner_id: currentUser.id,
             title: tripTitle,
-            duration_days: durationDays,
-            estimated_budget: budget
+            duration_days: durationDays
           }
         ])
         .select()
@@ -120,10 +183,14 @@ export default function CustomTripModal({
 
       if (tripError) throw tripError;
 
-      // 2. Insertar gemas asignadas
+      setActiveTripId(tripData.id);
+
+      // 2. Insertar paradas (gemas o personalizadas)
       const spotsPayload = selectedSpots.map((item, index) => ({
         trip_id: tripData.id,
-        spot_id: item.spot.id,
+        spot_id: item.spot?.id || null,
+        custom_title: item.custom_title || null,
+        custom_address: item.custom_address || null,
         day_number: item.day,
         order_index: index
       }));
@@ -134,7 +201,7 @@ export default function CustomTripModal({
 
       if (spotsError) throw spotsError;
 
-      // 3. Insertar colaboradores invitados
+      // 3. Registrar colaboradores invitados
       if (invitedEmails.length > 0) {
         const collabPayload = invitedEmails.map(email => ({
           trip_id: tripData.id,
@@ -145,9 +212,9 @@ export default function CustomTripModal({
         await supabase.from('trip_collaborators').insert(collabPayload);
       }
 
-      // Trazar ruta en el mapa
-      const spotsForRoute = selectedSpots.map(item => item.spot);
-      onApplyTripToMap(spotsForRoute);
+      // Trazar en el mapa solo las gemas con coordenadas geográficas
+      const routeSpots = selectedSpots.filter(item => item.spot).map(item => item.spot);
+      onApplyTripToMap(routeSpots);
 
       setSuccess(true);
     } catch (err: any) {
@@ -160,10 +227,11 @@ export default function CustomTripModal({
   const handleResetAndClose = () => {
     setTripTitle('');
     setDurationDays(2);
-    setBudget('Presupuesto Medio');
     setSearchQuery('');
+    setCustomPlaceName('');
     setSelectedSpots([]);
     setInvitedEmails([]);
+    setActiveTripId(null);
     setSuccess(false);
     onClose();
   };
@@ -179,10 +247,16 @@ export default function CustomTripModal({
               <Route className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                Crear Viaje Personalizado
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <span>Crear Viaje Personalizado</span>
+                {isRealtimeActive && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[9px] font-bold flex items-center gap-1 border border-emerald-500/30">
+                    <Radio className="w-2.5 h-2.5 animate-pulse" />
+                    En vivo
+                  </span>
+                )}
               </h3>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">Planificador a la medida y colaborativo</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">Planificador colaborativo multiusuario</p>
             </div>
           </div>
 
@@ -202,7 +276,7 @@ export default function CustomTripModal({
                 ¡Viaje "{tripTitle}" Creado!
               </h4>
               <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xs mx-auto leading-relaxed">
-                La ruta ha sido cargada directamente en tu mapa. Los colaboradores invitados recibirán acceso para editar la ruta.
+                Ruta trazada en el mapa. Tus colaboradores invitados pueden conectarse y editar la lista de lugares en tiempo real.
               </p>
             </div>
             <button
@@ -215,13 +289,13 @@ export default function CustomTripModal({
         ) : (
           <div className="space-y-4 overflow-y-auto custom-scrollbar p-1 flex-1">
             
-            {/* 1. Datos Básicos del Viaje */}
+            {/* 1. Datos Básicos */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-              <div className="sm:col-span-3 space-y-1">
+              <div className="sm:col-span-2 space-y-1">
                 <label className="font-bold text-slate-700 dark:text-slate-300">Nombre del Viaje</label>
                 <input
                   type="text"
-                  placeholder="Ej: Fin de semana en La Fortuna con Amigos"
+                  placeholder="Ej: Paseo a La Fortuna con Amigos"
                   value={tripTitle}
                   onChange={e => setTripTitle(e.target.value)}
                   className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
@@ -242,29 +316,13 @@ export default function CustomTripModal({
                   className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
-
-              <div className="sm:col-span-2 space-y-1">
-                <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                  <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Presupuesto Estimado</span>
-                </label>
-                <select
-                  value={budget}
-                  onChange={e => setBudget(e.target.value)}
-                  className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
-                >
-                  <option value="Económico">Económico (Mochilero)</option>
-                  <option value="Presupuesto Medio">Presupuesto Medio</option>
-                  <option value="Premium">Premium / Resort</option>
-                </select>
-              </div>
             </div>
 
             {/* 2. Colaboradores Invitados */}
             <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 space-y-2">
               <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Invitar Personas al Viaje</span>
+                <span>Invitar Amigos por Correo</span>
               </label>
               <div className="flex items-center gap-1.5">
                 <input
@@ -300,40 +358,65 @@ export default function CustomTripModal({
               )}
             </div>
 
-            {/* 3. Buscador de Gemas */}
+            {/* 3. Parada Personalizada (Lugar Fuera de Lista) */}
+            <div className="p-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 space-y-2">
+              <label className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                <span>¿Lugar fuera del mapa? Agregalo como parada personal</span>
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  placeholder="Ej: Casa de la abuela, Restaurante conocido..."
+                  value={customPlaceName}
+                  onChange={e => setCustomPlaceName(e.target.value)}
+                  className="flex-1 p-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
+                />
+                {Array.from({ length: durationDays }).map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleAddCustomPlace(idx + 1)}
+                    className="px-2 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition-all whitespace-nowrap"
+                  >
+                    + Día {idx + 1}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 4. Buscador de Gemas del Mapa */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                 <Search className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Buscar y Agregar Gemas al Viaje</span>
+                <span>O seleccionar gemas registradas</span>
               </label>
 
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Buscar por nombre (ej: Catarata, Soda, Mirador)..."
+                  placeholder="Buscar gemas..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 
-              {/* Lista de Gemas Disponibles */}
-              <div className="max-h-36 overflow-y-auto custom-scrollbar space-y-1.5 border border-slate-200 dark:border-slate-800/80 rounded-xl p-2 bg-slate-50/50 dark:bg-slate-900/30">
+              <div className="max-h-32 overflow-y-auto custom-scrollbar space-y-1 border border-slate-200 dark:border-slate-800/80 rounded-xl p-2 bg-slate-50/50 dark:bg-slate-900/30">
                 {filteredSpots.length === 0 ? (
-                  <p className="text-[10px] text-slate-400 text-center py-2">No se encontraron gemas.</p>
+                  <p className="text-[10px] text-slate-400 text-center py-2">No hay coincidencia.</p>
                 ) : (
-                  filteredSpots.slice(0, 10).map(spot => {
-                    const isAdded = selectedSpots.some(item => item.spot.id === spot.id);
+                  filteredSpots.slice(0, 8).map(spot => {
+                    const isAdded = selectedSpots.some(item => item.spot?.id === spot.id);
                     return (
                       <div
                         key={spot.id}
-                        className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 text-xs"
+                        className="flex items-center justify-between p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 text-xs"
                       >
-                        <div className="truncate pr-2">
-                          <p className="font-bold text-slate-900 dark:text-white truncate">{spot.title}</p>
-                          <p className="text-[9px] text-slate-500 truncate">{spot.address_text || 'Costa Rica'}</p>
-                        </div>
+                        <span className="font-bold text-slate-900 dark:text-white truncate max-w-[180px]">
+                          {spot.title}
+                        </span>
 
                         {isAdded ? (
                           <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Agregado ✓</span>
@@ -343,7 +426,7 @@ export default function CustomTripModal({
                               <button
                                 key={idx}
                                 onClick={() => handleAddSpotToTrip(spot, idx + 1)}
-                                className="px-2 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-400 font-bold text-[9px] border border-emerald-200 dark:border-emerald-800 transition-all"
+                                className="px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 hover:bg-emerald-600 hover:text-white text-emerald-800 dark:text-emerald-300 font-bold text-[9px] transition-all"
                               >
                                 + Día {idx + 1}
                               </button>
@@ -357,28 +440,35 @@ export default function CustomTripModal({
               </div>
             </div>
 
-            {/* 4. Lista de Gemas Seleccionadas para la Ruta */}
+            {/* 5. Resumen de la Ruta */}
             {selectedSpots.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-slate-200/80 dark:border-slate-800/80">
+              <div className="space-y-1.5 pt-2 border-t border-slate-200/80 dark:border-slate-800/80">
                 <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  Ruta del Viaje ({selectedSpots.length} lugares seleccionados)
+                  Itinerario del Viaje ({selectedSpots.length} paradas)
                 </label>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   {selectedSpots.map((item, idx) => (
                     <div
                       key={idx}
-                      className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between text-xs"
+                      className="p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs"
                     >
                       <div className="flex items-center gap-2 truncate pr-2">
                         <span className="px-1.5 py-0.5 rounded-md bg-emerald-600 text-white font-extrabold text-[9px]">
                           Día {item.day}
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-white truncate">{item.spot.title}</span>
+                        <span className="font-bold text-slate-900 dark:text-white truncate">
+                          {item.spot ? item.spot.title : item.custom_title}
+                        </span>
+                        {!item.spot && (
+                          <span className="text-[9px] bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
+                            Parada libre
+                          </span>
+                        )}
                       </div>
 
                       <button
-                        onClick={() => handleRemoveSpotFromTrip(item.spot.id)}
+                        onClick={() => handleRemoveSpotFromTrip(idx)}
                         className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -389,22 +479,19 @@ export default function CustomTripModal({
               </div>
             )}
 
-            {/* Botón Guardar */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={handleSaveTrip}
-                disabled={loading}
-                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                <span>{loading ? 'Guardando Viaje...' : 'Guardar y Trazar Ruta'}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleSaveTrip}
+              disabled={loading}
+              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+              <span>{loading ? 'Guardando Viaje...' : 'Guardar y Trazar Ruta Colaborativa'}</span>
+            </button>
 
           </div>
         )}
