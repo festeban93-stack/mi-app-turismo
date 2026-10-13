@@ -7,6 +7,7 @@ import DiscoveryHub from '@/components/DiscoveryHub';
 import AddSpotModal from '@/components/AddSpotModal';
 import AICopilotDrawer from '@/components/AICopilotDrawer';
 import AuthModal from '@/components/AuthModal';
+import UserProfileModal from '@/components/UserProfileModal';
 import { Plus, Bot, Trash2, User, LogOut } from 'lucide-react';
 
 const MapWithNoSSR = dynamic(() => import('@/components/MapClient'), {
@@ -35,6 +36,7 @@ export default function HomePage() {
   // Estado de Autenticación
   const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
 
   // Modales y Drawers
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -135,7 +137,7 @@ export default function HomePage() {
         />
       </div>
 
-      {/* 2. HEADER MINIMALISTA DE MARCA Y SESIÓN */}
+      {/* 2. HEADER MINIMALISTA DE MARCA Y PERFIL */}
       <div className="absolute top-3 left-3 right-3 md:right-auto z-20 flex items-center justify-between md:justify-start gap-2 pointer-events-auto">
         
         {/* LOGO */}
@@ -169,15 +171,17 @@ export default function HomePage() {
           })}
         </div>
 
-        {/* BOTÓN DE SESIÓN */}
+        {/* BOTÓN DE PERFIL / INGRESO */}
         {currentUser ? (
           <button
-            onClick={handleSignOut}
-            className="p-1.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-rose-500 transition-colors shadow-md flex items-center gap-1 text-[10px] font-bold"
-            title="Cerrar sesión"
+            onClick={() => setIsProfileModalOpen(true)}
+            className="p-1 px-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-bold text-[10px] shadow-md hover:bg-slate-100 transition-all flex items-center gap-1.5"
+            title="Ver mi perfil"
           >
-            <LogOut className="w-3.5 h-3.5 text-rose-500" />
-            <span className="hidden sm:inline">Salir</span>
+            <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-[10px]">
+              {currentUser?.user_metadata?.full_name?.charAt(0)?.toUpperCase() || currentUser?.email?.charAt(0)?.toUpperCase() || 'E'}
+            </div>
+            <span className="hidden sm:inline truncate max-w-[80px]">Mi Perfil</span>
           </button>
         ) : (
           <button
@@ -279,6 +283,13 @@ export default function HomePage() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onSuccess={() => setIsAddModalOpen(true)}
+      />
+
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentUser={currentUser}
+        onSignOut={handleSignOut}
       />
 
       <AICopilotDrawer
