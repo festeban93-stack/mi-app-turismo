@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import DiscoveryHub from '@/components/DiscoveryHub';
+import SpotDetailCard from '@/components/SpotDetailCard';
 import AddSpotModal from '@/components/AddSpotModal';
 import AICopilotDrawer from '@/components/AICopilotDrawer';
 import AuthModal from '@/components/AuthModal';
@@ -237,41 +238,15 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* 4. DASHBOARD COMPACTO */}
+      {/* 4. DASHBOARD / PANELS */}
       <div className="fixed bottom-0 left-0 right-0 z-30 md:absolute md:top-14 md:bottom-auto md:left-auto md:right-3 md:w-80 pointer-events-auto transition-all duration-300">
         {selectedSpot ? (
-          <div className="w-full bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t md:border border-slate-200/80 dark:border-slate-800/80 rounded-t-2xl md:rounded-xl p-4 shadow-2xl space-y-3 max-h-[42vh] md:max-h-[calc(100vh-4.5rem)] overflow-y-auto custom-scrollbar">
-            <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 pb-2">
-              <span className="px-2 py-0.5 text-[9px] uppercase font-bold rounded-md bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
-                {selectedSpot.category || 'naturaleza'}
-              </span>
-              <button
-                onClick={() => setSelectedSpot(null)}
-                className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 flex items-center justify-center text-xs transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">{selectedSpot.title}</h3>
-
-            <div className="space-y-1 text-[11px] text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800/80">
-              <p><strong>🕒 Horario:</strong> {selectedSpot.opening_hours || 'Lunes a Domingo 8:00 AM - 5:00 PM'}</p>
-              <p><strong>🎟️ Entrada:</strong> {selectedSpot.entry_fee || 'Entrada Libre'}</p>
-              <p><strong>📍 Dirección:</strong> {selectedSpot.address_text || 'Costa Rica'}</p>
-            </div>
-
-            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-              {selectedSpot.description}
-            </p>
-
-            <button
-              onClick={() => setSelectedSpot(null)}
-              className="w-full py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-[11px] font-bold text-slate-700 dark:text-slate-200 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
-            >
-              ← Volver
-            </button>
-          </div>
+          <SpotDetailCard
+            spot={selectedSpot}
+            onClose={() => setSelectedSpot(null)}
+            currentUser={currentUser}
+            onRequireAuth={handleOpenAuthForLogin}
+          />
         ) : (
           <div className="w-full max-h-[38vh] md:max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-t-2xl md:rounded-xl custom-scrollbar shadow-2xl">
             <DiscoveryHub
