@@ -37,6 +37,7 @@ export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [authIntent, setAuthIntent] = useState<'LOGIN_ONLY' | 'ADD_SPOT' | null>(null);
 
   // Modales y Drawers
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -77,12 +78,26 @@ export default function HomePage() {
     fetchSpots();
   }, []);
 
+  const handleOpenAuthForLogin = () => {
+    setAuthIntent('LOGIN_ONLY');
+    setIsAuthModalOpen(true);
+  };
+
   const handleOpenAddSpot = () => {
     if (!currentUser) {
+      setAuthIntent('ADD_SPOT');
       setIsAuthModalOpen(true);
     } else {
       setIsAddModalOpen(true);
     }
+  };
+
+  const handleAuthSuccess = () => {
+    setIsAuthModalOpen(false);
+    if (authIntent === 'ADD_SPOT') {
+      setIsAddModalOpen(true);
+    }
+    setAuthIntent(null);
   };
 
   const handleSignOut = async () => {
@@ -184,7 +199,7 @@ export default function HomePage() {
           </button>
         ) : (
           <button
-            onClick={() => setIsAuthModalOpen(true)}
+            onClick={handleOpenAuthForLogin}
             className="px-2.5 py-1.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-bold text-[10px] shadow-md hover:bg-slate-100 transition-all flex items-center gap-1"
           >
             <User className="w-3.5 h-3.5 text-emerald-600" />
@@ -280,8 +295,11 @@ export default function HomePage() {
       {/* 5. MODALES Y DRAWERS */}
       <AuthModal
         isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onSuccess={() => setIsAddModalOpen(true)}
+        onClose={() => {
+          setIsAuthModalOpen(false);
+          setAuthIntent(null);
+        }}
+        onSuccess={handleAuthSuccess}
       />
 
       <UserProfileModal
