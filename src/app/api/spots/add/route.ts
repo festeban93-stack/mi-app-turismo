@@ -25,13 +25,14 @@ export async function POST(request: Request) {
       address_text,
       opening_hours,
       entry_fee,
-      explorer_nickname
+      explorer_nickname,
+      image_url
     } = body;
 
-    if (!title || !latitude || !longitude) {
+    if (!title || !latitude || !longitude || !image_url) {
       return NextResponse.json({
         success: false,
-        error: 'El título y las coordenadas GPS son obligatorios.',
+        error: 'El título, coordenadas GPS y una fotografía de evidencia son obligatorios.',
       }, { status: 400 });
     }
 
@@ -55,8 +56,11 @@ export async function POST(request: Request) {
       address_text: address_text ? address_text.trim() : 'Costa Rica',
       opening_hours: opening_hours ? opening_hours.trim() : 'Consultar en el lugar',
       entry_fee: entry_fee ? entry_fee.trim() : 'Entrada Libre',
+      image_url: image_url,
+      explorer_nickname: explorer_nickname ? explorer_nickname.trim() : 'Explorador Anónimo',
       source_type: 'crowdsource',
-      is_verified: true,
+      is_verified: false, // Inicia NO VERIFICADO para moderacion manual/IA
+      verification_status: 'pending'
     };
 
     const { data, error } = await supabaseAdmin
@@ -79,9 +83,9 @@ export async function POST(request: Request) {
         latitude: lat,
         longitude: lng,
       },
-      points_awarded: 50,
-      badge_unlocked: 'Pionero Local 🏅',
-      explorer_nickname: explorer_nickname || 'Explorador Anónimo',
+      message: 'Gema enviada a revisión. Recibirás tus +50 Pts una vez sea verificada.',
+      points_pending: 50,
+      badge_unlocked: 'Candidato a Pionero 🏅',
     }, { status: 200 });
 
   } catch (err: any) {
