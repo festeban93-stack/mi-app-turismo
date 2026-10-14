@@ -12,7 +12,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Icono Azul Estándar
+// Icono Azul Estándar Elegante
 const defaultIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
@@ -22,26 +22,39 @@ const defaultIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-// Función para crear marcadores numerados de ruta (1, 2, 3...)
-function createNumberedRouteIcon(index: number) {
+// Marcadores Estilizados tipo Pin con Número de Orden (Pin Vectorial Pro)
+function createNumberedRouteIcon(index: number, totalSpots: number) {
+  const isStart = index === 0;
+  const isEnd = index === totalSpots - 1;
+
+  const badgeColor = isStart ? '#10b981' : isEnd ? '#f43f5e' : '#059669';
+  const labelText = isStart ? '1' : `${index + 1}`;
+
+  const svgMarker = `
+    <div style="position: relative; width: 36px; height: 46px; display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.35));">
+      <svg width="36" height="46" viewBox="0 0 36 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 0C8.05887 0 0 8.05887 0 18C0 31.5 18 46 18 46C18 46 36 31.5 36 18C36 8.05887 27.9411 0 18 0Z" fill="${badgeColor}"/>
+        <circle cx="18" cy="18" r="13" fill="#ffffff"/>
+      </svg>
+      <span style="
+        position: absolute;
+        top: 7px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-weight: 900;
+        font-size: 13px;
+        color: ${badgeColor};
+        line-height: 1;
+        user-select: none;
+      ">${labelText}</span>
+    </div>
+  `;
+
   return L.divIcon({
-    className: 'custom-route-marker',
-    html: `<div style="
-      background-color: #059669;
-      color: white;
-      font-weight: 900;
-      font-size: 11px;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 3px solid white;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    ">${index + 1}</div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14]
+    className: 'custom-pin-marker',
+    html: svgMarker,
+    iconSize: [36, 46],
+    iconAnchor: [18, 46],
+    popupAnchor: [0, -42]
   });
 }
 
@@ -70,7 +83,7 @@ function MapController({ routeSpots, selectedSpot }: { routeSpots?: any[]; selec
 
       if (validCoords.length > 0) {
         const bounds = L.latLngBounds(validCoords);
-        map.fitBounds(bounds, { padding: [70, 70], maxZoom: 14, animate: true });
+        map.fitBounds(bounds, { padding: [80, 80], maxZoom: 14, animate: true });
       }
     }
   }, [routeSpots, selectedSpot, map]);
@@ -81,7 +94,6 @@ function MapController({ routeSpots, selectedSpot }: { routeSpots?: any[]; selec
 export default function MapClient({ spots, selectedSpot, onSelectSpot, routeSpots = [] }: MapClientProps) {
   const defaultCenter: [number, number] = [9.7489, -83.7534];
 
-  // Coordenadas ordenadas para la polínea
   const routePolylineCoords = routeSpots
     .filter(s => s?.latitude && s?.longitude)
     .map(s => [parseFloat(s.latitude), parseFloat(s.longitude)] as [number, number])
@@ -101,15 +113,21 @@ export default function MapClient({ spots, selectedSpot, onSelectSpot, routeSpot
 
       <MapController routeSpots={routeSpots} selectedSpot={selectedSpot} />
 
-      {/* Polínea de Ruta Trazada */}
+      {/* Capa Base de Sombra para la Polínea */}
       {routePolylineCoords.length > 1 && (
-        <Polyline
-          positions={routePolylineCoords}
-          pathOptions={{ color: '#059669', weight: 5, dashArray: '6, 8', opacity: 0.95 }}
-        />
+        <>
+          <Polyline
+            positions={routePolylineCoords}
+            pathOptions={{ color: '#0f172a', weight: 8, opacity: 0.3 }}
+          />
+          <Polyline
+            positions={routePolylineCoords}
+            pathOptions={{ color: '#10b981', weight: 5, dashArray: '8, 10', opacity: 0.95, lineCap: 'round' }}
+          />
+        </>
       )}
 
-      {/* Renderizado de Gemas Estándar */}
+      {/* Renderizado de Gemas */}
       {spots.map((spot) => {
         if (!spot.latitude || !spot.longitude) return null;
         const lat = parseFloat(spot.latitude);
@@ -123,18 +141,25 @@ export default function MapClient({ spots, selectedSpot, onSelectSpot, routeSpot
           <Marker
             key={spot.id}
             position={[lat, lon]}
-            icon={isPartOfRoute ? createNumberedRouteIcon(routeIndex) : defaultIcon}
+            icon={isPartOfRoute ? createNumberedRouteIcon(routeIndex, routeSpots.length) : defaultIcon}
             eventHandlers={{
               click: () => onSelectSpot(spot),
             }}
           >
             <Popup>
-              <div className="p-1 text-xs space-y-1 font-sans">
-                <strong className="block text-slate-900 font-extrabold">{spot.title}</strong>
-                <p className="text-slate-600 text-[10px]">{spot.address_text || 'Costa Rica'}</p>
+              <div className="p-1.5 text-xs space-y-1 font-sans">
+                <div className="flex items-center gap-1.5">
+                  {isPartOfRoute && (
+                    <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-extrabold text-[10px] flex items-center justify-center">
+                      {routeIndex + 1}
+                    </span>
+                  )}
+                  <strong className="block text-slate-900 font-extrabold leading-snug">{spot.title}</strong>
+                </div>
+                <p className="text-slate-500 text-[10px]">{spot.address_text || 'Costa Rica'}</p>
                 {isPartOfRoute && (
-                  <span className="inline-block px-2 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-bold">
-                    Parada #{routeIndex + 1} de la Ruta
+                  <span className="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold border border-emerald-300">
+                    {routeIndex === 0 ? '🏁 Inicio de la Ruta' : routeIndex === routeSpots.length - 1 ? '🎯 Destino Final' : `Parada #${routeIndex + 1}`}
                   </span>
                 )}
               </div>
