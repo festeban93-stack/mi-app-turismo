@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,8 +9,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Se requiere un arreglo de spots válido.' }, { status: 400 });
     }
 
-    // Inserción en Supabase ignorando duplicados por título
-    const { data, error } = await supabase
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    // Usar SERVICE_ROLE_KEY si existe (ignora RLS), o fallback a ANON_KEY
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json({ error: 'Configuración de Supabase incompleta.' }, { status: 500 });
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false }
+    });
+
+    // Inserción masiva ignorando duplicados por título
+    const { data, error } = await supabaseAdmin
       .from('spots')
       .upsert(spots, { onConflict: 'title', ignoreDuplicates: true });
 
