@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 export const maxDuration = 30;
@@ -11,7 +11,6 @@ function cleanText(str: string = ''): string {
     .trim();
 }
 
-// Cálculo de distancia Haversine (km)
 function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -25,7 +24,6 @@ function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lo
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Ordenamiento de la ruta por cercanía geográfica
 function optimizeRouteSequence(spots: any[]): any[] {
   if (spots.length <= 1) return spots;
   const unvisited = [...spots];
@@ -63,7 +61,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'El prompt es requerido.' }, { status: 400 });
     }
 
-    // 1. Obtener gemas de Supabase
     const { data: allSpots, error: spotsError } = await supabase
       .from('spots')
       .select('id, title, description, category, latitude, longitude, address_text, entry_fee, opening_hours, typical_dishes, local_tips');
@@ -75,7 +72,6 @@ export async function POST(req: NextRequest) {
     const spotsList = (allSpots || []).filter(s => s.latitude && s.longitude);
     const cleanPrompt = cleanText(prompt);
 
-    // 2. Filtrado y ponderación de candidatos
     const tokens = cleanPrompt.split(/\s+/).filter(t => t.length > 2 && !['quiero', 'dame', 'plan', 'dias', 'para', 'como', 'hacer'].includes(t));
     
     let candidateSpots = spotsList.filter(spot => {
@@ -89,7 +85,6 @@ export async function POST(req: NextRequest) {
       candidateSpots = candidateSpots.slice(0, 30);
     }
 
-    // 3. Verificación de la API Key de Google Gemini
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
     if (!apiKey) {
@@ -100,7 +95,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4. Invocación a Google Gemini 2.5 Flash con modo JSON estructurado
     const spotsContext = candidateSpots.map(s => 
       `[ID: ${s.id}] "${s.title}" | Ubicación: ${s.address_text} | Categoría: ${s.category} | Descripción: ${s.description}`
     ).join('\n');
@@ -121,7 +115,7 @@ INVENTARIO DE GEMAS DISPONIBLES:
 ${spotsContext}
 `;
 
-    const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const requestBody = {
       contents: [
@@ -165,14 +159,12 @@ ${spotsContext}
     const parsedData = JSON.parse(rawContent);
     const selectedIds: string[] = parsedData.selectedSpotIds || [];
 
-    // Mapear los IDs devueltos por Gemini
     let rawSuggestedSpots = candidateSpots.filter(s => selectedIds.includes(s.id));
     
     if (rawSuggestedSpots.length === 0) {
       rawSuggestedSpots = candidateSpots.slice(0, 4);
     }
 
-    // Reordenar las gemas por optimización geográfica
     const suggestedSpots = optimizeRouteSequence(rawSuggestedSpots);
 
     return NextResponse.json({
