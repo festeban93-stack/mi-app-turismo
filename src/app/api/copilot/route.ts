@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+export const maxDuration = 30;
+
 function cleanText(str: string = ''): string {
   return str
     .toLowerCase()
@@ -9,9 +11,9 @@ function cleanText(str: string = ''): string {
     .trim();
 }
 
-// Cálculo de distancia en kilómetros entre dos coordenadas
+// Cálculo de distancia Haversine (km)
 function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Radio de la Tierra en km
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -20,39 +22,37 @@ function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lo
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Algoritmo del Vecino Más Cercano (Nearest Neighbor) para optimizar la secuencia de viaje
+// Ordenamiento de la ruta por cercanía geográfica
 function optimizeRouteSequence(spots: any[]): any[] {
   if (spots.length <= 1) return spots;
-
   const unvisited = [...spots];
-  const optimizedRoute = [unvisited.shift()!];
+  const optimized = [unvisited.shift()!];
 
   while (unvisited.length > 0) {
-    const currentSpot = optimizedRoute[optimizedRoute.length - 1];
-    let closestIndex = 0;
+    const current = optimized[optimized.length - 1];
+    let closestIdx = 0;
     let minDistance = Infinity;
 
-    unvisited.forEach((spot, index) => {
+    unvisited.forEach((spot, idx) => {
       const dist = calculateHaversineDistance(
-        parseFloat(currentSpot.latitude),
-        parseFloat(currentSpot.longitude),
+        parseFloat(current.latitude),
+        parseFloat(current.longitude),
         parseFloat(spot.latitude),
         parseFloat(spot.longitude)
       );
       if (dist < minDistance) {
         minDistance = dist;
-        closestIndex = index;
+        closestIdx = idx;
       }
     });
 
-    optimizedRoute.push(unvisited.splice(closestIndex, 1)[0]);
+    optimized.push(unvisited.splice(closestIdx, 1)[0]);
   }
 
-  return optimizedRoute;
+  return optimized;
 }
 
 export async function POST(req: NextRequest) {
@@ -63,117 +63,128 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'El prompt es requerido.' }, { status: 400 });
     }
 
+    // 1. Obtener gemas de Supabase
     const { data: allSpots, error: spotsError } = await supabase
       .from('spots')
       .select('id, title, description, category, latitude, longitude, address_text, entry_fee, opening_hours, typical_dishes, local_tips');
 
-    if (spotsError) console.error('Error consultando Supabase:', spotsError);
+    if (spotsError) {
+      console.error('Error consultando Supabase:', spotsError);
+    }
 
     const spotsList = (allSpots || []).filter(s => s.latitude && s.longitude);
     const cleanPrompt = cleanText(prompt);
 
-    const keywords = cleanPrompt
-      .split(/\s+/)
-      .filter(w => w.length > 2 && !['quiero', 'ruta', 'cerca', 'donde', 'para', 'como', 'hacer', 'unas', 'unos', 'esta', 'este'].includes(w));
-
-    const scoredSpots = spotsList.map(spot => {
-      const titleNorm = cleanText(spot.title);
-      const addressNorm = cleanText(spot.address_text);
-      const descNorm = cleanText(spot.description);
-      const catNorm = cleanText(spot.category);
-
-      let score = 0;
-      keywords.forEach(kw => {
-        if (titleNorm.includes(kw)) score += 10;
-        if (addressNorm.includes(kw)) score += 8;
-        if (catNorm.includes(kw)) score += 5;
-        if (descNorm.includes(kw)) score += 3;
-      });
-
-      return { spot, score };
+    // 2. Filtrado y ponderación de candidatos
+    const tokens = cleanPrompt.split(/\s+/).filter(t => t.length > 2 && !['quiero', 'dame', 'plan', 'dias', 'para', 'como', 'hacer'].includes(t));
+    
+    let candidateSpots = spotsList.filter(spot => {
+      const spotText = cleanText(`${spot.title} ${spot.address_text} ${spot.description} ${spot.category}`);
+      return tokens.some(token => spotText.includes(token));
     });
 
-    scoredSpots.sort((a, b) => b.score - a.score);
-
-    let rawMatchedSpots = scoredSpots.filter(s => s.score > 0).map(s => s.spot);
-
-    if (rawMatchedSpots.length === 0) {
-      if (cleanPrompt.includes('cafe') || cleanPrompt.includes('comida') || cleanPrompt.includes('restaurante')) {
-        rawMatchedSpots = spotsList.filter(s => s.category === 'gastronomia').slice(0, 4);
-      } else if (cleanPrompt.includes('catarata') || cleanPrompt.includes('mirador') || cleanPrompt.includes('playa')) {
-        rawMatchedSpots = spotsList.filter(s => s.category === 'naturaleza').slice(0, 4);
-      } else {
-        rawMatchedSpots = spotsList.slice(0, 4);
-      }
+    if (candidateSpots.length < 3) {
+      candidateSpots = spotsList.slice(0, 30);
     } else {
-      rawMatchedSpots = rawMatchedSpots.slice(0, 5);
+      candidateSpots = candidateSpots.slice(0, 30);
     }
 
-    // APLICAR OPTIMIZACIÓN GEOGRÁFICA DE LA RUTA
-    const matchedSpots = optimizeRouteSequence(rawMatchedSpots);
+    // 3. Verificación de la API Key de Google Gemini
+    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
-    if (process.env.OPENAI_API_KEY) {
-      const spotsContext = matchedSpots.map((s, idx) => 
-        `- Parada ${idx + 1}: "${s.title}" (${s.address_text}) | Platos: ${Array.isArray(s.typical_dishes) ? s.typical_dishes.join(', ') : 'N/A'}`
-      ).join('\n');
+    if (!apiKey) {
+      console.warn('⚠️ GEMINI_API_KEY no detectada.');
+      return NextResponse.json({
+        reply: `¡Pura vida! Tengo ${candidateSpots.length} gemas listas para mostrarte, pero falta configurar la variable **GEMINI_API_KEY** en \`.env.local\` o Vercel.`,
+        suggestedSpots: candidateSpots.slice(0, 4)
+      });
+    }
 
-      const systemInstruction = `
-Eres el Copiloto Turístico de MapAI Costa Rica.
-Has trazado una ruta en orden geográfico óptimo con las siguientes paradas consecutivas:
+    // 4. Invocación a Google Gemini 2.5 Flash con modo JSON estructurado
+    const spotsContext = candidateSpots.map(s => 
+      `[ID: ${s.id}] "${s.title}" | Ubicación: ${s.address_text} | Categoría: ${s.category} | Descripción: ${s.description}`
+    ).join('\n');
+
+    const systemInstructionText = `
+Eres "MapAI Copilot", un Agente de Viajes experto de Costa Rica, apasionado, servicial, cercano y natural (usa modismos ticos con equilibrio: "Pura vida", "Con mucho gusto", "Te recomiendo").
+
+TU TAREA:
+Responder la consulta del usuario armando una recomendación o itinerario detallado, atractivo y con formato Markdown (encabezados, viñetas, emojis).
+
+REGLAS STRICTAS:
+1. Si te piden un plan de varios días o varias paradas, organízalo por bloques (ej: "### 🗓️ Día 1: ..." o "### 📍 Paradas Recomendadas").
+2. Recomienda únicamente gemas del inventario disponible abajo.
+3. Para cada gema que menciones o recomiendes, DEBES incluir su "ID" exacto dentro del arreglo JSON "selectedSpotIds".
+4. Devuelve ÚNICAMENTE un objeto JSON con las claves "reply" y "selectedSpotIds".
+
+INVENTARIO DE GEMAS DISPONIBLES:
 ${spotsContext}
+`;
 
-Responde con tono tico cálido y directo. Explica brevemente la ruta siguiendo el orden de las paradas numeradas (1 a ${matchedSpots.length}).
-Devuelve ÚNICAMENTE este formato JSON estricto:
-{
-  "reply": "Tu respuesta explicativa..."
-}`;
+    const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
-      try {
-        const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: systemInstruction },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7,
-            response_format: { type: 'json_object' }
-          })
-        });
-
-        const aiData = await aiRes.json();
-        const rawContent = aiData.choices?.[0]?.message?.content;
-
-        if (rawContent) {
-          const parsed = JSON.parse(rawContent);
-          return NextResponse.json({
-            reply: parsed.reply,
-            suggestedSpots: matchedSpots
-          });
+    const requestBody = {
+      contents: [
+        ...history.slice(-4).map((m: any) => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.content }]
+        })),
+        {
+          role: 'user',
+          parts: [{ text: prompt }]
         }
-      } catch (e) {
-        console.error('Fallback por error en OpenAI API:', e);
+      ],
+      systemInstruction: {
+        parts: [{ text: systemInstructionText }]
+      },
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.7
       }
+    };
+
+    const response = await fetch(geminiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`Error de Gemini API (${response.status}):`, errText);
+      throw new Error(`Gemini API respondió con código ${response.status}`);
     }
 
-    const spotListFormatted = matchedSpots.map((s, i) => `${i + 1}. ${s.title} (${s.address_text})`).join('\n');
-    const replyText = `¡Listo! Trazé esta ruta optimizada en secuencia geográfica:\n\n${spotListFormatted}\n\nRevisá los puntos numerados del 1 al ${matchedSpots.length} en el mapa.`;
+    const aiData = await response.json();
+    const rawContent = aiData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!rawContent) {
+      throw new Error('Respuesta vacía recibida de Gemini');
+    }
+
+    const parsedData = JSON.parse(rawContent);
+    const selectedIds: string[] = parsedData.selectedSpotIds || [];
+
+    // Mapear los IDs devueltos por Gemini
+    let rawSuggestedSpots = candidateSpots.filter(s => selectedIds.includes(s.id));
+    
+    if (rawSuggestedSpots.length === 0) {
+      rawSuggestedSpots = candidateSpots.slice(0, 4);
+    }
+
+    // Reordenar las gemas por optimización geográfica
+    const suggestedSpots = optimizeRouteSequence(rawSuggestedSpots);
 
     return NextResponse.json({
-      reply: replyText,
-      suggestedSpots: matchedSpots
+      reply: parsedData.reply || '¡Pura vida! Aquí tienes las mejores recomendaciones.',
+      suggestedSpots
     });
 
   } catch (error: any) {
     console.error('Error en /api/copilot:', error);
-    return NextResponse.json(
-      { error: 'Error en el servidor.', details: error?.message },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      reply: `Inconveniente con el motor Gemini: **${error.message || 'Error de conexión'}**. Por favor verifica la API Key.`,
+      suggestedSpots: []
+    }, { status: 200 });
   }
 }
