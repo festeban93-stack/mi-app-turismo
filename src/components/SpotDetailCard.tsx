@@ -200,11 +200,11 @@ export default function SpotDetailCard({
       <div className="space-y-1.5 text-[11px] text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
         <div className="flex items-center gap-2">
           <Clock className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-          <span><strong>Horario:</strong> {spot.opening_hours || 'Lunes a Domingo 8:00 AM - 4:00 PM'}</span>
+          <span><strong>Horario:</strong> {spot.opening_hours || 'Sin confirmar'}</span>
         </div>
         <div className="flex items-center gap-2">
           <Ticket className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-          <span><strong>Entrada:</strong> {spot.entry_fee || 'Entrada Libre / Consultar tarifa local'}</span>
+          <span><strong>Entrada:</strong> {spot.entry_fee || 'Tarifa sin confirmar'}</span>
         </div>
         <div className="flex items-start gap-2">
           <MapPin className="w-3.5 h-3.5 text-rose-500 flex-shrink-0 mt-0.5" />

@@ -1,4 +1,5 @@
-﻿'use client';
+'use client';
+import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 import { useState, useEffect } from 'react';
 
@@ -10,7 +11,7 @@ interface ItineraryModalProps {
 }
 
 export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHighlightRoute }: ItineraryModalProps) {
-  const [region, setRegion] = useState('San José');
+  const [region, setRegion] = useState(selectedRegion && selectedRegion !== 'Todas' ? selectedRegion : 'San José');
   const [days, setDays] = useState('2');
   const [budget, setBudget] = useState('150');
   const [travelStyle, setTravelStyle] = useState('Aventura & Naturaleza');
@@ -19,13 +20,11 @@ export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHigh
 
   const regionsList = ['San José', 'La Fortuna / San Carlos', 'Manuel Antonio', 'Guanacaste'];
 
-  useEffect(() => {
-    if (selectedRegion && selectedRegion !== 'Todas') {
-      setRegion(selectedRegion);
-    } else {
-      setRegion('San José');
-    }
-  }, [selectedRegion, isOpen]);
+  const [previousRegion, setPreviousRegion] = useState(selectedRegion);
+  if (selectedRegion !== previousRegion) {
+    setPreviousRegion(selectedRegion);
+    setRegion(selectedRegion && selectedRegion !== 'Todas' ? selectedRegion : 'San José');
+  }
 
   if (!isOpen) return null;
 
@@ -34,7 +33,7 @@ export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHigh
     setLoading(true);
 
     try {
-      const res = await fetch('/api/itinerary', {
+      const res = await authenticatedFetch('/api/itinerary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -46,6 +45,7 @@ export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHigh
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.reply || 'Servicio no disponible.');
       if (data.success && data.itinerary) {
         setItineraryResult(data.itinerary);
       }

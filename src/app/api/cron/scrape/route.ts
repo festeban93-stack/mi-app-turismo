@@ -1,4 +1,6 @@
-﻿import { NextResponse } from 'next/server';
+import { validCoordinates } from '@/lib/server/spots';
+import { requireCron } from '@/lib/server/access';
+import { NextResponse } from 'next/server';
 
 const ZONES = [
   { name: 'Guanacaste Norte', bbox: '10.20,-85.90,10.50,-85.70' },
@@ -14,16 +16,14 @@ const OVERPASS_ENDPOINTS = [
 ];
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const secret = searchParams.get('secret');
-  
-  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-  }
+  const denied = requireCron(request);
+  if (denied) return denied;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  if (!supabaseUrl || !supabaseKey) return NextResponse.json({ error: 'Servicio no configurado.' }, { status: 503 });
+  let failed = false;
   const randomZone = ZONES[Math.floor(Math.random() * ZONES.length)];
   let addedCount = 0;
   const logResults: string[] = [];
@@ -64,24 +64,10 @@ export async function GET(request: Request) {
     }
   }
 
-  // Fallback a generación de POIs descubiertos si los endpoints externos no responden en local
-  if (!fetchSuccessful || elements.length === 0) {
-    elements = [
-      {
-        tags: { name: `Soda & Mirador ${randomZone.name}`, amenity: 'restaurant' },
-        lat: 10.3 + (Math.random() * 0.1),
-        lon: -85.5 + (Math.random() * 0.1)
-      },
-      {
-        tags: { name: `Catarata Escondida ${randomZone.name}`, tourism: 'attraction' },
-        lat: 10.4 + (Math.random() * 0.1),
-        lon: -84.7 + (Math.random() * 0.1)
-      }
-    ];
-  }
+  if (!fetchSuccessful) return NextResponse.json({ error: 'OpenStreetMap no disponible.' }, { status: 502 });
 
   for (const el of elements) {
-    if (el.tags && el.tags.name) {
+    if (el.tags && el.tags.name && validCoordinates(el.lat, el.lon)) {
       const name = el.tags.name;
       const lat = el.lat;
       const lng = el.lon;
@@ -92,44 +78,43 @@ export async function GET(request: Request) {
 
       if (supabaseUrl && supabaseKey) {
         try {
-          const rpcUrl = `${supabaseUrl}/rest/v1/rpc/insert_poi_with_location`;
+          const rpcUrl = `${supabaseUrl}/rest/v1/spots?on_conflict=title`;
           const dbRes = await fetch(rpcUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Prefer': 'resolution=ignore-duplicates,return=representation',
               'apikey': supabaseKey,
               'Authorization': `Bearer ${supabaseKey}`
             },
             body: JSON.stringify({
-              p_name: name,
-              p_category: category,
-              p_region: randomZone.name,
-              p_lat: lat,
-              p_lng: lng,
-              p_short_desc: `Descubierto automáticamente por MapAI en ${randomZone.name}.`,
-              p_ai_story: `${name} es un punto de interés localizado en ${randomZone.name}.`,
-              p_tags: ['auto-scraped', category.toLowerCase(), randomZone.name.toLowerCase()],
-              p_price: 0
+              title: name, category: category === 'Gastronomía' ? 'gastronomia' : category.toLowerCase(),
+              location: `SRID=4326;POINT(${lng} ${lat})`,
+              address_text: randomZone.name, description: 'Importado de OpenStreetMap; pendiente de revisión.',
+              opening_hours: 'Sin confirmar', entry_fee: 'Sin confirmar',
+              source_type: 'osm', is_verified: false, verification_status: 'pending'
             })
           });
 
           if (dbRes.ok) {
-            addedCount++;
+            const inserted = await dbRes.json();
+            addedCount += Array.isArray(inserted) ? inserted.length : 0;
             logResults.push(`Añadido: ${name} (${randomZone.name})`);
-          }
+          } else { failed = true; }
         } catch (err) {
-          console.error('Error insertando en DB:', err);
+          failed = true;
+          console.error('Error insertando en DB');
         }
       }
     }
   }
 
   return NextResponse.json({
-    success: true,
+    success: !failed,
     message: `¡Auto-scraping ejecutado para ${randomZone.name}!`,
-    source: fetchSuccessful ? 'OpenStreetMap Live' : 'Generador Auto-Ingesta',
+    source: 'OpenStreetMap Live',
     places_processed: elements.length,
     new_places_added: addedCount,
     details: logResults
-  });
+  }, { status: failed ? 503 : 200 });
 }

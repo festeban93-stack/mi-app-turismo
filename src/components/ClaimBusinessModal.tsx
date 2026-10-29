@@ -9,15 +9,17 @@ interface ClaimBusinessModalProps {
   onClose: () => void;
   currentUser: any;
   availableSpots?: any[];
+  initialSpotId?: string;
 }
 
 export default function ClaimBusinessModal({
   isOpen,
   onClose,
   currentUser,
-  availableSpots = []
+  availableSpots = [],
+  initialSpotId = ''
 }: ClaimBusinessModalProps) {
-  const [selectedSpotId, setSelectedSpotId] = useState<string>('');
+  const [selectedSpotId, setSelectedSpotId] = useState<string>(initialSpotId);
   const [customBusinessName, setCustomBusinessName] = useState('');
   const [phone, setPhone] = useState('');
   const [taxId, setTaxId] = useState('');

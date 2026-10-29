@@ -1,5 +1,7 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { requireAI } from '@/lib/server/access';
+import { readJSON } from '@/lib/server/body';
+import { NextRequest, NextResponse } from 'next/server';
+import { GET as getSpots } from '../spots/route';
 
 export const maxDuration = 30;
 
@@ -57,19 +59,13 @@ export async function POST(req: NextRequest) {
   try {
     const { prompt, history = [] } = await req.json();
 
-    if (!prompt) {
+    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 5000 || !Array.isArray(history) || history.length > 20) {
       return NextResponse.json({ error: 'El prompt es requerido.' }, { status: 400 });
     }
 
-    const { data: allSpots, error: spotsError } = await supabase
-      .from('spots')
-      .select('id, title, description, category, latitude, longitude, address_text, entry_fee, opening_hours, typical_dishes, local_tips');
-
-    if (spotsError) {
-      console.error('Error consultando Supabase:', spotsError);
-    }
-
-    const spotsList = (allSpots || []).filter(s => s.latitude && s.longitude);
+    const catalog = await getSpots();
+    if (!catalog.ok) return catalog;
+    const { spots: spotsList }: { spots: any[] } = await catalog.json();
     const cleanPrompt = cleanText(prompt);
 
     const tokens = cleanPrompt.split(/\s+/).filter(t => t.length > 2 && !['quiero', 'dame', 'plan', 'dias', 'para', 'como', 'hacer'].includes(t));
@@ -85,7 +81,7 @@ export async function POST(req: NextRequest) {
       candidateSpots = candidateSpots.slice(0, 30);
     }
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
       console.warn('⚠️ GEMINI_API_KEY no detectada.');
@@ -173,10 +169,10 @@ ${spotsContext}
     });
 
   } catch (error: any) {
-    console.error('Error en /api/copilot:', error);
+    console.error('Error en /api/copilot');
     return NextResponse.json({
-      reply: `Inconveniente con el motor Gemini: **${error.message || 'Error de conexión'}**. Por favor verifica la API Key.`,
+      reply: 'No fue posible generar recomendaciones. Intentá nuevamente.',
       suggestedSpots: []
-    }, { status: 200 });
+    }, { status: 503 });
   }
 }

@@ -1,43 +1,21 @@
-﻿import { NextResponse } from 'next/server';
+import { GET as getPlaces } from '../places/route';
+import { requireAI } from '@/lib/server/access';
+import { readJSON } from '@/lib/server/body';
+import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
+  const denied = await requireAI(request);
+  if (denied) return denied;
   try {
-    const { region, days, budget, travel_style } = await request.json();
+    const { region, days, budget, travel_style } = await readJSON(request, 32 * 1024);
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
-
-    if (!region || !days || !budget) {
-      return NextResponse.json({ error: 'Faltan parámetros de viaje obligatorios.' }, { status: 400 });
+    if (typeof region !== 'string' || region.length > 150 || !Number.isInteger(Number(days)) || Number(days) < 1 || Number(days) > 30 || !Number.isFinite(Number(budget)) || Number(budget) < 0) {
+      return NextResponse.json({ error: 'Parámetros de viaje inválidos.' }, { status: 400 });
     }
-
-    let availablePlaces: any[] = [];
-
-    if (supabaseUrl && supabaseKey) {
-      try {
-        const rpcUrl = `${supabaseUrl}/rest/v1/rpc/get_places_geojson`;
-        const dbRes = await fetch(rpcUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`
-          }
-        });
-
-        if (dbRes.ok) {
-          const data = await dbRes.json();
-          if (Array.isArray(data)) {
-            availablePlaces = data.filter((p: any) =>
-              region === 'Todas' || !p.region || p.region.toLowerCase().includes(region.toLowerCase())
-            );
-          }
-        }
-      } catch (err) {
-        console.warn('⚠️ Consulta a Supabase en fallback local.');
-      }
-    }
+    const catalog = await getPlaces(new Request(`https://internal.test/api/places?region=${encodeURIComponent(region)}`));
+    if (!catalog.ok) return catalog;
+    const availablePlaces: any[] = await catalog.json();
 
     let itineraryPlan: any[] = [];
 

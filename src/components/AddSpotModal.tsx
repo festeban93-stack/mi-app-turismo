@@ -1,5 +1,7 @@
 'use client';
 
+import { authenticatedFetch } from '@/lib/authenticated-fetch';
+
 import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { 
@@ -58,6 +60,8 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
+  useEffect(() => () => { if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview); }, [imagePreview]);
+
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,7 +76,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
     }
   }, [isOpen, locationMode]);
 
-  const fetchGPSLocation = () => {
+  function fetchGPSLocation() {
     if (!navigator.geolocation) {
       setLocationError('Tu dispositivo no soporta geolocalización GPS.');
       return;
@@ -133,6 +137,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setImageUrl('');
     const localPreviewUrl = URL.createObjectURL(file);
     setImagePreview(localPreviewUrl);
     setIsUploadingImage(true);
@@ -141,7 +146,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch('/api/upload', {
+      const res = await authenticatedFetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
@@ -162,7 +167,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
     }
   };
 
-  const resetForm = () => {
+  function resetForm() {
     setTitle('');
     setCategory('naturaleza');
     setDescription('');
@@ -185,7 +190,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
     setIsSubmitting(true);
 
     try {
-      const res = await fetch('/api/spots/add', {
+      const res = await authenticatedFetch('/api/spots/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -270,14 +275,14 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
               <div className="space-y-1">
                 <h4 className="text-xl font-black text-white">¡Gema Enviada a Verificación!</h4>
                 <p className="text-xs text-slate-300">
-                  Gracias <span className="font-bold text-cyan-400">{rewardData.spot?.explorer_nickname}</span>. Tu foto e información están en revisión.
+                  Gracias <span className="font-bold text-cyan-400">{nickname || 'por tu aporte'}</span>. Tu foto e información están en revisión.
                 </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/80 space-y-2 max-w-xs mx-auto shadow-inner">
                 <div className="flex items-center justify-center gap-2 text-emerald-400 text-xs font-extrabold">
                   <Award className="w-4 h-4" />
-                  <span>+50 Pts acreditados tras aprobación</span>
+                  <span>Tu aporte será revisado antes de publicarse</span>
                 </div>
               </div>
 
@@ -365,7 +370,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                     <div className="space-y-1">
                       <label className="text-[11px] text-slate-400 flex items-center gap-1">
                         <Link2 className="w-3 h-3 text-cyan-400" />
-                        <span>Pegá link de Google Maps o coordenadas "lat, lng":</span>
+                        <span>Pegá link de Google Maps o coordenadas &quot;lat, lng&quot;:</span>
                       </label>
                       <input
                         type="text"

@@ -22,13 +22,11 @@ export default function AddPlaceModal({ isOpen, onClose, onPlaceAdded, currentLa
   const miniMapRef = useRef<any>(null);
   const miniMarkerRef = useRef<any>(null);
 
-  // Sincronizar coordenadas si cambian por selección externa
-  useEffect(() => {
-    if (currentLatLng) {
-      setLat(currentLatLng.lat);
-      setLng(currentLatLng.lng);
-    }
-  }, [currentLatLng]);
+  const [previousLocation, setPreviousLocation] = useState(currentLatLng);
+  if (currentLatLng !== previousLocation) {
+    setPreviousLocation(currentLatLng);
+    if (currentLatLng) { setLat(currentLatLng.lat); setLng(currentLatLng.lng); }
+  }
 
   // Inicializar y actualizar el mini-mapa dentro del modal
   useEffect(() => {

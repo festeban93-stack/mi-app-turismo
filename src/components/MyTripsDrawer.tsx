@@ -35,14 +35,10 @@ export default function MyTripsDrawer({
   const [loading, setLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && currentUser) {
-      fetchUserTrips();
-    }
-  }, [isOpen, currentUser]);
+  const [previousOpen, setPreviousOpen] = useState(isOpen);
+  if (previousOpen !== isOpen) { setPreviousOpen(isOpen); if (isOpen) setLoading(true); }
 
-  const fetchUserTrips = async () => {
-    setLoading(true);
+  async function fetchUserTrips() {
     try {
       const { data } = await supabase
         .from('trips')
@@ -50,13 +46,22 @@ export default function MyTripsDrawer({
         .eq('owner_id', currentUser.id)
         .order('created_at', { ascending: false });
 
-      if (data) setTrips(data);
+      return data;
     } catch (err) {
       console.error('Error cargando viajes:', err);
-    } finally {
-      setLoading(false);
+
     }
   };
+
+
+  useEffect(() => {
+    if (isOpen && currentUser) {
+      let active = true;
+      fetchUserTrips().then(data => { if (active) { if (data) setTrips(data); setLoading(false); } });
+      return () => { active = false; };
+    }
+  }, [isOpen, currentUser]);
+
 
   const handleSelectTrip = async (trip: any) => {
     setSelectedTrip(trip);

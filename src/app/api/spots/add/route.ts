@@ -1,97 +1,22 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { requireAccess, consumeQuota, serviceClient } from '@/lib/server/access';
+import { BodyError, readJSON } from '@/lib/server/body';
+import { pendingSpot } from '@/lib/server/spots';
 
 export async function POST(request: Request) {
+  const access = await requireAccess(request);
+  if (access instanceof Response) return access;
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-    if (!supabaseUrl || !serviceKey) {
-      return NextResponse.json({
-        success: false,
-        error: 'Variables de Supabase no configuradas.',
-      }, { status: 400 });
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
-
-    const body = await request.json().catch(() => ({}));
-    const {
-      title,
-      description,
-      category,
-      latitude,
-      longitude,
-      address_text,
-      opening_hours,
-      entry_fee,
-      explorer_nickname,
-      image_url
-    } = body;
-
-    if (!title || !latitude || !longitude || !image_url) {
-      return NextResponse.json({
-        success: false,
-        error: 'El título, coordenadas GPS y una fotografía de evidencia son obligatorios.',
-      }, { status: 400 });
-    }
-
-    const lat = parseFloat(latitude);
-    const lng = parseFloat(longitude);
-
-    if (isNaN(lat) || isNaN(lng)) {
-      return NextResponse.json({
-        success: false,
-        error: 'Coordenadas GPS inválidas.',
-      }, { status: 400 });
-    }
-
-    const newSpot = {
-      title: title.trim(),
-      description: description ? description.trim() : 'Gema oculta compartida por la comunidad de exploradores.',
-      category: ['gastronomia', 'naturaleza', 'aventura', 'cultura', 'hospedaje'].includes(category)
-        ? category
-        : 'naturaleza',
-      location: `SRID=4326;POINT(${lng} ${lat})`,
-      address_text: address_text ? address_text.trim() : 'Costa Rica',
-      opening_hours: opening_hours ? opening_hours.trim() : 'Consultar en el lugar',
-      entry_fee: entry_fee ? entry_fee.trim() : 'Entrada Libre',
-      image_url: image_url,
-      explorer_nickname: explorer_nickname ? explorer_nickname.trim() : 'Explorador Anónimo',
-      source_type: 'crowdsource',
-      is_verified: false, // Inicia NO VERIFICADO para moderacion manual/IA
-      verification_status: 'pending'
-    };
-
-    const { data, error } = await supabaseAdmin
-      .from('spots')
-      .insert([newSpot])
-      .select()
-      .single();
-
-    if (error) {
-      return NextResponse.json({
-        success: false,
-        error: `Error al guardar en base de datos: ${error.message}`,
-      }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      spot: {
-        ...data,
-        latitude: lat,
-        longitude: lng,
-      },
-      message: 'Gema enviada a revisión. Recibirás tus +50 Pts una vez sea verificada.',
-      points_pending: 50,
-      badge_unlocked: 'Candidato a Pionero 🏅',
-    }, { status: 200 });
-
-  } catch (err: any) {
-    return NextResponse.json({
-      success: false,
-      error: `Excepción en servidor: ${err?.message || 'Error desconocido'}`,
-    }, { status: 500 });
+    const body = await readJSON(request);
+    const spot = pendingSpot(body);
+    const imagePrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/spot-images/uploads/${access.user.id}/`;
+    if (!spot.image_url?.startsWith(imagePrefix)) throw new BodyError('Subí una fotografía desde tu cuenta.');
+    const denied = await consumeQuota(access.user.id, 'spot');
+    if (denied) return denied;
+    const { data, error } = await serviceClient().from('spots').insert(spot).select('id,title,verification_status').single();
+    if (error) throw error;
+    return NextResponse.json({ success: true, spot: data, message: 'Destino enviado a revisión. Aparecerá en el mapa cuando sea aprobado.' }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error instanceof BodyError ? error.message : 'No fue posible guardar el destino.' }, { status: error instanceof BodyError ? error.status : 503 });
   }
 }

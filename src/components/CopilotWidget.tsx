@@ -1,4 +1,5 @@
-﻿'use client';
+'use client';
+import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 import { useState } from 'react';
 
@@ -42,7 +43,7 @@ export default function CopilotWidget({ allPlaces, onFilterPlaces, onResetFilter
     setLoading(true);
 
     try {
-      const res = await fetch('/api/copilot', {
+      const res = await authenticatedFetch('/api/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -52,6 +53,7 @@ export default function CopilotWidget({ allPlaces, onFilterPlaces, onResetFilter
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.reply || 'Servicio no disponible.');
 
       setChatHistory((prev) => [...prev, { sender: 'ai', text: data.response_text }]);
 
