@@ -121,9 +121,9 @@ un viaje propio, día y costo en su moneda. Se conserva el viaje de origen: esta
 no traslada ni borra la parada original. El guardado usa el RPC transaccional existente con control de versión.
 No requiere otra migración SQL. Para nuevas paradas personalizadas sin coordenadas, confirmar ubicación en el viaje de destino.
 
-### Pi: portada e idiomas
+### MapAI: portada e idiomas
 
-La ruta `/` presenta Pi con cuatro fotografías reales de Costa Rica. El carrusel cambia cada 5 segundos,
+La ruta `/` presenta MapAI con cuatro fotografías reales de Costa Rica. El carrusel cambia cada 5 segundos,
 permite avanzar, retroceder o pausar, respeta movimiento reducido y se pausa con el acceso a la cuenta abierto.
 Las fotografías WebP locales tienen 1920 px de ancho; las fuentes originales tienen entre 2560 y 6000 px.
 Créditos, fuentes y transformaciones: `public/photos/credits.json`. Los dos archivos de Wikimedia se distribuyen

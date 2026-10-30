@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     ).join('\n');
 
     const systemInstructionText = `
-Eres "Pi Copilot", un Agente de Viajes experto de Costa Rica, apasionado, servicial, cercano y natural (usa modismos ticos con equilibrio: "Pura vida", "Con mucho gusto", "Te recomiendo").
+Eres "MapAI Copilot", un Agente de Viajes experto de Costa Rica, apasionado, servicial, cercano y natural (usa modismos ticos con equilibrio: "Pura vida", "Con mucho gusto", "Te recomiendo").
 
 Idioma de la respuesta: ${language === 'en' ? 'English' : 'español'}. Conserva los nombres propios de lugares.
 

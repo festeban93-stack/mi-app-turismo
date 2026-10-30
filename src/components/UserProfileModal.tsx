@@ -103,7 +103,7 @@ export default function UserProfileModal({
           <div className="h-24 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 relative p-4 flex justify-between items-start">
             <span className="px-2.5 py-1 rounded-full bg-slate-950/30 backdrop-blur-md text-white text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 border border-white/20">
               <Sparkles className="w-3 h-3 text-emerald-300" />
-              <span>Pi Pass</span>
+              <span>MapAI Pass</span>
             </span>
 
             <button
@@ -253,7 +253,7 @@ export default function UserProfileModal({
           </div>
 
           <div className="p-3 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200/80 dark:border-slate-800/80 text-center text-[10px] text-slate-400">
-            Pi · Costa Rica
+            MapAI · Costa Rica
           </div>
 
         </div>

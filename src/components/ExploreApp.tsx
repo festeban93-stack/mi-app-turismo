@@ -208,7 +208,7 @@ export default function HomePage() {
       <div className="absolute top-3 left-3 right-3 md:right-auto z-20 flex items-center justify-between md:justify-start gap-2 pointer-events-auto">
         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 rounded-xl px-2.5 py-1.5 shadow-md flex items-center gap-1.5">
           <span className="font-extrabold text-xs tracking-tight text-slate-900 dark:text-white">
-            Pi<span className="text-emerald-600 dark:text-emerald-400">.</span>
+            MapAI<span className="text-emerald-600 dark:text-emerald-400">.</span>
           </span>
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
         </div>

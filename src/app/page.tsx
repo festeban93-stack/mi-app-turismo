@@ -32,7 +32,7 @@ export default function PiHome() {
   <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(5,37,29,.85)_0%,rgba(5,37,29,.52)_48%,rgba(5,37,29,.12)_100%)]"/>
   <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#092e29]/80 via-transparent to-black/20"/>
   <header className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center justify-between gap-4 px-6 py-6 sm:px-10 lg:px-16 lg:py-9">
-   <Link href="/" aria-label="Pi — Inicio" className="flex items-center gap-2 text-4xl font-extrabold tracking-tight"><Compass strokeWidth={1.7} className="h-9 w-9"/>Pi<span className="text-[#deeba9]">.</span></Link>
+   <Link href="/" aria-label="MapAI — Inicio" className="flex items-center gap-2 text-4xl font-extrabold tracking-tight"><Compass strokeWidth={1.7} className="h-9 w-9"/>MapAI<span className="text-[#deeba9]">.</span></Link>
    <nav aria-label={t('Navegación principal')} className="flex flex-wrap items-center gap-3 sm:gap-6">
     <LanguageSwitch light/>
     <a href="#como-funciona" className="hidden text-sm font-semibold text-white/90 lg:block">{t('Cómo funciona')}</a>
