@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from '@/lib/i18n';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 import React, { useState, useEffect } from 'react';
@@ -36,6 +37,7 @@ export default function AICopilotDrawer({
   onApplyRouteToMap,
   onClearRoute
 }: AICopilotDrawerProps) {
+  const { t, language } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -71,7 +73,7 @@ export default function AICopilotDrawer({
       const res = await authenticatedFetch('/api/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({ language,
           prompt: promptText,
           history: updatedMessages.map(m => ({ role: m.role, content: m.content }))
         })
@@ -111,7 +113,7 @@ export default function AICopilotDrawer({
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
-      alert('Debés iniciar sesión para guardar este viaje en tu cuenta.');
+      alert(t("Debés iniciar sesión para guardar este viaje en tu cuenta."));
       return;
     }
 
@@ -149,10 +151,10 @@ export default function AICopilotDrawer({
           </div>
           <div>
             <h3 className="text-sm font-extrabold flex items-center gap-1.5">
-              <span>Copiloto Turístico IA</span>
+              <span>{t("Copiloto Turístico IA")}</span>
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             </h3>
-            <p className="text-[10px] text-slate-500">Búsqueda y rutas inteligentes</p>
+            <p className="text-[10px] text-slate-500">{t("Búsqueda y rutas inteligentes")}</p>
           </div>
         </div>
         <button onClick={onClose} className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400">
@@ -187,24 +189,22 @@ export default function AICopilotDrawer({
                   : 'bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-bl-none text-slate-800 dark:text-slate-200'
               }`}
             >
-              <p>{msg.content}</p>
+              <p>{t(msg.content)}</p>
 
               {msg.suggestedSpots && msg.suggestedSpots.length > 0 && (
                 <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                       <Route className="w-3 h-3" />
-                      Ruta enfocada en mapa ({msg.suggestedSpots.length} gemas)
-                    </span>
+                      {t(" Ruta enfocada en mapa (")}{msg.suggestedSpots.length} {t(" gemas) ")}</span>
                   </div>
 
-                  <label className="block text-xs font-bold">Duración del viaje (días)
-                    <input aria-label="Duración de la ruta IA" type="number" min={1} max={30} value={routeDays[index] ?? 2}
+                  <label className="block text-xs font-bold">{t("Duración del viaje (días) ")}<input aria-label={t("Duración de la ruta IA")} type="number" min={1} max={30} value={routeDays[index] ?? 2}
                       onChange={e => setRouteDays(prev => ({ ...prev, [index]: Math.max(1, Math.min(30, Number(e.target.value) || 1)) }))}
                       className="w-full rounded-lg border p-2 bg-white text-slate-900" />
                   </label>
                   <button
-                    onClick={() => handleSaveAIRouteToMyTrips(msg.suggestedSpots!, messages[index - 1]?.content || 'Ruta IA', routeDays[index] ?? 2)}
+                    onClick={() => handleSaveAIRouteToMyTrips(msg.suggestedSpots!, messages[index - 1]?.content || t("Ruta IA"), routeDays[index] ?? 2)}
                     disabled={savingTripId === messages[index - 1]?.content}
                     className="w-full py-2 px-3 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-950 hover:bg-slate-800 font-bold text-[10px] shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
@@ -213,7 +213,7 @@ export default function AICopilotDrawer({
                     ) : (
                       <BookmarkPlus className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
                     )}
-                    <span>Guardar esta Ruta en Mis Viajes</span>
+                    <span>{t("Guardar esta Ruta en Mis Viajes")}</span>
                   </button>
                 </div>
               )}
@@ -230,7 +230,7 @@ export default function AICopilotDrawer({
         {loading && (
           <div className="flex items-center gap-2 text-xs text-slate-400 p-2">
             <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
-            <span>Consultando gemas y trazando mapa...</span>
+            <span>{t("Consultando gemas y trazando mapa...")}</span>
           </div>
         )}
       </div>
@@ -240,7 +240,7 @@ export default function AICopilotDrawer({
         <div className="flex items-center gap-1.5">
           <input
             type="text"
-            placeholder="Ej: Ruta de café y miradores en Sarchí..."
+            placeholder={t("Ej: Ruta de café y miradores en Sarchí...")}
             value={inputPrompt}
             onChange={e => setInputPrompt(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSendMessage()}

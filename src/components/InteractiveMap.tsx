@@ -1,4 +1,5 @@
 ﻿'use client';
+import { useLanguage } from '@/lib/i18n';
 
 import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -22,6 +23,7 @@ interface Place {
 }
 
 export default function InteractiveMap() {
+  const { t } = useLanguage();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [places, setPlaces] = useState<Place[]>([]);
   const [allPlacesBackup, setAllPlacesBackup] = useState<Place[]>([]);
@@ -197,16 +199,15 @@ export default function InteractiveMap() {
             <h1 className="text-xl font-bold flex items-center gap-2 text-emerald-400">
               🧭 MapAI Costa Rica
             </h1>
-            <p className="text-xs text-slate-400">Exploración turística e historias por IA</p>
+            <p className="text-xs text-slate-400">{t("Exploración turística e historias por IA")}</p>
           </div>
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setIsItineraryOpen(true)}
               className="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/40 font-bold px-2.5 py-1.5 rounded-lg text-xs shadow transition-all active:scale-95 flex items-center gap-1"
-              title="Planear Ruta con IA"
+              title={t("Planear Ruta con IA")}
             >
-              <span>🗺️</span> Ruta
-            </button>
+              <span>🗺️</span> {t(" Ruta ")}</button>
             <button
               onClick={() => setIsModalOpen(true)}
               className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-2.5 py-1.5 rounded-lg text-xs shadow transition-all transform active:scale-95 flex items-center gap-1"
@@ -217,7 +218,7 @@ export default function InteractiveMap() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-slate-300">Región</label>
+          <label className="text-xs font-semibold text-slate-300">{t("Región")}</label>
           <select
             value={selectedRegion}
             onChange={(e) => setSelectedRegion(e.target.value)}
@@ -230,7 +231,7 @@ export default function InteractiveMap() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-slate-300">Categoría</label>
+          <label className="text-xs font-semibold text-slate-300">{t("Categoría")}</label>
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
@@ -254,26 +255,24 @@ export default function InteractiveMap() {
 
             <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-700/60 mt-1">
               <span className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1 mb-1">
-                ✨ Guía Virtual IA
-              </span>
+                {t(" ✨ Guía Virtual IA ")}</span>
               <p className="text-xs text-slate-300 italic leading-relaxed">{selectedPlace.ai_story}</p>
             </div>
 
             <div className="flex justify-between items-center text-xs text-slate-400 mt-1">
-              <span>💲 Est. ${selectedPlace.estimated_price_usd} USD</span>
+              <span>{t("💲 Est. $")}{selectedPlace.estimated_price_usd} USD</span>
               <span>⭐ {selectedPlace.rating || 4.8}</span>
             </div>
 
             <button
-              onClick={() => currentUser ? setIsClaimModalOpen(true) : alert('Iniciá sesión desde el mapa principal para reclamar un negocio.')}
+              onClick={() => currentUser ? setIsClaimModalOpen(true) : alert(t("Iniciá sesión desde el mapa principal para reclamar un negocio."))}
               className="mt-2 w-full bg-slate-900 hover:bg-slate-800 border border-amber-500/50 hover:border-amber-400 text-amber-300 font-semibold py-2 px-3 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 shadow"
             >
-              <span>🏆</span> ¿Eres el dueño? Reclamar Negocio
-            </button>
+              <span>🏆</span> {t(" ¿Eres el dueño? Reclamar Negocio ")}</button>
           </div>
         ) : (
           <div className="text-xs text-slate-500 text-center py-8 border border-dashed border-slate-800 rounded-xl flex flex-col items-center gap-2">
-            <span>📍 Haz clic en cualquier marcador del mapa para desplegar los detalles e historia de la Guía Virtual.</span>
+            <span>{t("📍 Haz clic en cualquier marcador del mapa para desplegar los detalles e historia de la Guía Virtual.")}</span>
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from '@/lib/i18n';
 
 import React from 'react';
 import { 
@@ -28,14 +29,14 @@ export default function DiscoveryHub({
   onOpenAICopilot,
   onOpenAddSpotModal,
 }: DiscoveryHubProps) {
+  const { t } = useLanguage();
   return (
     <div className="w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t md:border border-slate-200/80 dark:border-slate-800 rounded-t-3xl md:rounded-2xl p-3.5 space-y-3.5 text-slate-900 dark:text-slate-100 shadow-2xl">
       
       {/* 1. SECCIÓN DE EXPLORACIÓN RÁPIDA */}
       <div className="space-y-2">
         <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          Exploración por Intención
-        </h4>
+          {t(" Exploración por Intención ")}</h4>
 
         <div className="grid grid-cols-2 gap-1.5">
           {[
@@ -73,7 +74,7 @@ export default function DiscoveryHub({
               >
                 <Icon className="w-4 h-4" />
                 <p className="text-[11px] font-bold leading-tight group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors">
-                  {item.title}
+                  {t(item.title)}
                 </p>
               </button>
             );
@@ -86,8 +87,7 @@ export default function DiscoveryHub({
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
             <Sparkles className="w-3 h-3 animate-pulse" />
-            Itinerarios Sugeridos
-          </span>
+            {t(" Itinerarios Sugeridos ")}</span>
         </div>
 
         <div className="space-y-1.5">
@@ -101,7 +101,7 @@ export default function DiscoveryHub({
               onClick={() => onOpenAICopilot(item.prompt)}
               className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-500/50 text-[11px] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all flex items-center justify-between group"
             >
-              <span className="truncate pr-2 font-medium">{item.label}</span>
+              <span className="truncate pr-2 font-medium">{t(item.label)}</span>
               <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 transition-colors flex-shrink-0" />
             </button>
           ))}
@@ -112,8 +112,7 @@ export default function DiscoveryHub({
       {featuredSpots.length > 0 && (
         <div className="space-y-2 pt-1 border-t border-slate-200/80 dark:border-slate-800/80">
           <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Gemas Destacadas
-          </h4>
+            {t(" Gemas Destacadas ")}</h4>
 
           <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
             {featuredSpots.map((spot) => (

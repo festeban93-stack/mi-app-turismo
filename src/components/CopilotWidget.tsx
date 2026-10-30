@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from '@/lib/i18n';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 import { useState } from 'react';
@@ -23,6 +24,7 @@ interface CopilotWidgetProps {
 }
 
 export default function CopilotWidget({ allPlaces, onFilterPlaces, onResetFilter }: CopilotWidgetProps) {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -79,7 +81,7 @@ export default function CopilotWidget({ allPlaces, onFilterPlaces, onResetFilter
           className="fixed bottom-6 right-6 z-30 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 border border-emerald-300 transition-all transform hover:scale-105 active:scale-95"
         >
           <span className="text-lg">🤖</span>
-          <span className="text-sm">Copiloto IA</span>
+          <span className="text-sm">{t("Copiloto IA")}</span>
         </button>
       )}
 
@@ -90,16 +92,15 @@ export default function CopilotWidget({ allPlaces, onFilterPlaces, onResetFilter
           <div className="bg-slate-800 p-3.5 border-b border-slate-700 flex justify-between items-center">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
-              <h3 className="font-bold text-sm text-emerald-300">Copiloto de Ruta IA</h3>
+              <h3 className="font-bold text-sm text-emerald-300">{t("Copiloto de Ruta IA")}</h3>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={onResetFilter}
                 className="text-[10px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-300"
-                title="Restablecer mapa completo"
+                title={t("Restablecer mapa completo")}
               >
-                Reset Mapa
-              </button>
+                {t(" Reset Mapa ")}</button>
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-slate-400 hover:text-white font-bold px-1.5 text-lg"
@@ -125,8 +126,7 @@ export default function CopilotWidget({ allPlaces, onFilterPlaces, onResetFilter
             ))}
             {loading && (
               <div className="bg-slate-800 border border-slate-700 text-emerald-400 p-2.5 rounded-xl self-start text-xs flex items-center gap-2">
-                <span className="animate-spin">🌀</span> Calculando la mejor ruta...
-              </div>
+                <span className="animate-spin">🌀</span> {t(" Calculando la mejor ruta... ")}</div>
             )}
           </div>
 
@@ -134,7 +134,7 @@ export default function CopilotWidget({ allPlaces, onFilterPlaces, onResetFilter
           <form onSubmit={handleSendMessage} className="p-3 bg-slate-800/80 border-t border-slate-700 flex gap-2">
             <input
               type="text"
-              placeholder="Ej: ¿Qué hacer con $30 si llueve?"
+              placeholder={t("Ej: ¿Qué hacer con $30 si llueve?")}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               className="flex-1 bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 outline-none focus:border-emerald-500"
@@ -144,8 +144,7 @@ export default function CopilotWidget({ allPlaces, onFilterPlaces, onResetFilter
               disabled={loading}
               className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-2 rounded-lg text-xs transition-colors disabled:opacity-50"
             >
-              Enviar
-            </button>
+              {t(" Enviar ")}</button>
           </form>
         </div>
       )}

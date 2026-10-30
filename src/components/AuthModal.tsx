@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from '@/lib/i18n';
 
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -11,6 +12,7 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
@@ -75,9 +77,9 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
 
         if (error) {
           if (error.message.includes('Email not confirmed')) {
-            setErrorMsg('Tu correo electrónico aún no ha sido verificado. Por favor revisá tu bandeja de entrada o spam.');
+            setErrorMsg(t("Tu correo electrónico aún no ha sido verificado. Por favor revisá tu bandeja de entrada o spam."));
           } else {
-            setErrorMsg('Correo o contraseña incorrectos.');
+            setErrorMsg(t("Correo o contraseña incorrectos."));
           }
         } else if (data?.session) {
           if (onSuccess) onSuccess();
@@ -103,9 +105,9 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                {emailConfirmationSent ? 'Verificá tu Correo' : isSignUp ? 'Crear Cuenta' : 'Iniciar Sesión'}
+                {emailConfirmationSent ? t("Verificá tu Correo") : isSignUp ? t("Crear Cuenta") : t("Iniciar Sesión")}
               </h3>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">MapAI Costa Rica</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">Pi · Costa Rica</p>
             </div>
           </div>
           <button
@@ -121,13 +123,11 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
           <div className="py-4 text-center space-y-3">
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto animate-bounce" />
             <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
-              ¡Enlace de Activación Enviado!
-            </h4>
+              {t(" ¡Enlace de Activación Enviado! ")}</h4>
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              Enviamos un correo a <strong className="text-emerald-600 dark:text-emerald-400">{email}</strong>. Por favor abrí el enlace para activar tu cuenta en MapAI.
-            </p>
+              {t(" Enviamos un correo a ")}<strong className="text-emerald-600 dark:text-emerald-400">{email}</strong>{t(". Por favor abrí el enlace para activar tu cuenta en Pi. ")}</p>
             <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 text-left">
-              💡 Si no lo encontrás en un par de minutos, revisá tu carpeta de <strong>Spam / Correo no deseado</strong>.
+              {t(" 💡 Si no lo encontrás en un par de minutos, revisá tu carpeta de ")}<strong>{t("Spam / Correo no deseado")}</strong>.
             </div>
             <button
               onClick={() => {
@@ -136,7 +136,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
               }}
               className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-all flex items-center justify-center gap-1.5"
             >
-              <span>Ir a Iniciar Sesión</span>
+              <span>{t("Ir a Iniciar Sesión")}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -154,26 +154,25 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
               </svg>
-              <span>Continuar con Google</span>
+              <span>{t("Continuar con Google")}</span>
             </button>
 
             <div className="relative flex items-center justify-center">
               <hr className="w-full border-slate-200 dark:border-slate-800" />
               <span className="absolute px-2 bg-white dark:bg-slate-900 text-[10px] text-slate-400 font-semibold uppercase">
-                o con correo
-              </span>
+                {t(" o con correo ")}</span>
             </div>
 
             {/* Formulario Correo / Contraseña */}
             <form onSubmit={handleEmailAuth} className="space-y-3">
               {errorMsg && (
                 <p className="text-[10px] text-rose-500 bg-rose-50 dark:bg-rose-950/40 p-2.5 rounded-xl border border-rose-200 dark:border-rose-800/40 font-medium leading-tight">
-                  ⚠️ {errorMsg}
+                  ⚠️ {t(errorMsg)}
                 </p>
               )}
 
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Correo Electrónico</label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">{t("Correo Electrónico")}</label>
                 <div className="relative">
                   <Mail className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
                   <input
@@ -188,7 +187,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Contraseña</label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">{t("Contraseña")}</label>
                 <div className="relative">
                   <Lock className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
                   <input
@@ -208,7 +207,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
                 className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
                 <LogIn className="w-3.5 h-3.5" />
-                <span>{loading ? 'Procesando...' : isSignUp ? 'Registrarme' : 'Iniciar Sesión'}</span>
+                <span>{loading ? 'Procesando...' : isSignUp ? 'Registrarme' : t("Iniciar Sesión")}</span>
               </button>
             </form>
 
@@ -221,7 +220,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
                 }}
                 className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold hover:underline"
               >
-                {isSignUp ? '¿Ya tenés cuenta? Iniciá sesión' : '¿No tenés cuenta? Registrate gratis'}
+                {isSignUp ? t("¿Ya tenés cuenta? Iniciá sesión") : t("¿No tenés cuenta? Registrate gratis")}
               </button>
             </div>
           </>

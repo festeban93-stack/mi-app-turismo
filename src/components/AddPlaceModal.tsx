@@ -1,4 +1,5 @@
 ﻿'use client';
+import { useLanguage } from '@/lib/i18n';
 
 import { useState, useEffect, useRef } from 'react';
 
@@ -10,6 +11,7 @@ interface AddPlaceModalProps {
 }
 
 export default function AddPlaceModal({ isOpen, onClose, onPlaceAdded, currentLatLng }: AddPlaceModalProps) {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [region, setRegion] = useState('San José');
   const [description, setDescription] = useState('');
@@ -79,7 +81,7 @@ export default function AddPlaceModal({ isOpen, onClose, onPlaceAdded, currentLa
   // FUNCIÓN GPS CORREGIDA CON RE-RENDERIZADO FORZADO DE LEAFLET
   const handleGetGPS = () => {
     if (!navigator.geolocation) {
-      alert('Tu navegador no soporta geolocalización GPS.');
+      alert(t("Tu navegador no soporta geolocalización GPS."));
       return;
     }
 
@@ -104,7 +106,7 @@ export default function AddPlaceModal({ isOpen, onClose, onPlaceAdded, currentLa
       (error) => {
         setGettingLocation(false);
         console.warn('⚠️ Error al obtener ubicación GPS:', error.message);
-        alert('No se pudo obtener la posición GPS. Puedes seleccionar el punto arrastrando el pin en el mapa.');
+        alert(t("No se pudo obtener la posición GPS. Puedes seleccionar el punto arrastrando el pin en el mapa."));
       },
       {
         enableHighAccuracy: true,
@@ -141,7 +143,7 @@ export default function AddPlaceModal({ isOpen, onClose, onPlaceAdded, currentLa
         setDescription('');
       }
     } catch (err) {
-      alert('Error al guardar la gema. Intenta de nuevo.');
+      alert(t("Error al guardar la gema. Intenta de nuevo."));
     } finally {
       setSubmitting(false);
     }
@@ -152,18 +154,17 @@ export default function AddPlaceModal({ isOpen, onClose, onPlaceAdded, currentLa
       <div className="bg-slate-900 border border-slate-700/80 w-full max-w-lg rounded-2xl p-5 shadow-2xl flex flex-col gap-4 text-white font-sans max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <h2 className="font-bold text-lg text-emerald-400 flex items-center gap-2">
-            💎 Añadir Gema Oculta
-          </h2>
+            {t(" 💎 Añadir Gema Oculta ")}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white font-bold text-lg">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3 text-xs">
           <div>
-            <label className="font-semibold text-slate-300 block mb-1">Nombre del Lugar / Rincón *</label>
+            <label className="font-semibold text-slate-300 block mb-1">{t("Nombre del Lugar / Rincón *")}</label>
             <input
               type="text"
               required
-              placeholder="Ej: Mirador El Silencio / Soda Doña Mary"
+              placeholder={t("Ej: Mirador El Silencio / Soda Doña Mary")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 outline-none focus:border-emerald-500 text-white"
@@ -172,7 +173,7 @@ export default function AddPlaceModal({ isOpen, onClose, onPlaceAdded, currentLa
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="font-semibold text-slate-300 block mb-1">Región</label>
+              <label className="font-semibold text-slate-300 block mb-1">{t("Región")}</label>
               <select
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
@@ -185,7 +186,7 @@ export default function AddPlaceModal({ isOpen, onClose, onPlaceAdded, currentLa
               </select>
             </div>
             <div>
-              <label className="font-semibold text-slate-300 block mb-1">Precio Est. ($ USD)</label>
+              <label className="font-semibold text-slate-300 block mb-1">{t("Precio Est. ($ USD)")}</label>
               <input
                 type="number"
                 min="0"
@@ -197,10 +198,10 @@ export default function AddPlaceModal({ isOpen, onClose, onPlaceAdded, currentLa
           </div>
 
           <div>
-            <label className="font-semibold text-slate-300 block mb-1">¿Por qué es especial? (Descripción corta)</label>
+            <label className="font-semibold text-slate-300 block mb-1">{t("¿Por qué es especial? (Descripción corta)")}</label>
             <textarea
               rows={2}
-              placeholder="Cuenta un secreto local, la mejor hora para ir o qué pedir de comer..."
+              placeholder={t("Cuenta un secreto local, la mejor hora para ir o qué pedir de comer...")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 outline-none focus:border-emerald-500 text-white"
@@ -211,8 +212,7 @@ export default function AddPlaceModal({ isOpen, onClose, onPlaceAdded, currentLa
           <div className="flex flex-col gap-1 mt-1">
             <div className="flex justify-between items-center">
               <label className="font-semibold text-slate-300 flex items-center gap-1">
-                📍 Ubicación Exacta:
-              </label>
+                {t(" 📍 Ubicación Exacta: ")}</label>
               <button
                 type="button"
                 onClick={handleGetGPS}
@@ -220,7 +220,7 @@ export default function AddPlaceModal({ isOpen, onClose, onPlaceAdded, currentLa
                 className="bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[11px] px-2.5 py-1 rounded border border-emerald-500/30 flex items-center gap-1 transition-colors"
               >
                 <span>{gettingLocation ? '🌀' : '🎯'}</span>
-                <span>{gettingLocation ? 'Ubicando GPS...' : 'Usar mi GPS'}</span>
+                <span>{gettingLocation ? t("Ubicando GPS...") : t("Usar mi GPS")}</span>
               </button>
             </div>
 
@@ -239,14 +239,13 @@ export default function AddPlaceModal({ isOpen, onClose, onPlaceAdded, currentLa
               onClick={onClose}
               className="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg font-semibold text-slate-300"
             >
-              Cancelar
-            </button>
+              {t(" Cancelar ")}</button>
             <button
               type="submit"
               disabled={submitting}
               className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1"
             >
-              {submitting ? 'Guardando...' : 'Guardar Gema'}
+              {submitting ? 'Guardando...' : t("Guardar Gema")}
             </button>
           </div>
         </form>

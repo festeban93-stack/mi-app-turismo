@@ -1,375 +1,58 @@
 'use client';
-
-import React, { useState, useEffect, useMemo } from 'react';
-import dynamic from 'next/dynamic';
-import { supabase } from '@/lib/supabase';
-import DiscoveryHub from '@/components/DiscoveryHub';
-import SpotDetailCard from '@/components/SpotDetailCard';
-import AddSpotModal from '@/components/AddSpotModal';
-import AICopilotDrawer from '@/components/AICopilotDrawer';
+import {useEffect,useState} from 'react';
+import Link from 'next/link';
+import {ArrowLeft,ArrowRight,Pause,Play,ArrowUpRight,UserRound,Compass} from 'lucide-react';
+import {supabase} from '@/lib/supabase';
 import AuthModal from '@/components/AuthModal';
-import UserProfileModal from '@/components/UserProfileModal';
-import CustomTripModal from '@/components/CustomTripModal';
-import MyTripsDrawer from '@/components/MyTripsDrawer';
-import { Plus, Bot, Trash2, User, Compass, BookmarkCheck } from 'lucide-react';
-
-const MapWithNoSSR = dynamic(() => import('@/components/MapClient'), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full bg-slate-100 dark:bg-slate-950 flex items-center justify-center text-slate-400">
-      <span className="animate-pulse text-xs">Cargando mapa interactivo...</span>
-    </div>
-  ),
-});
-
-function normalizeText(text: string = ''): string {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim();
-}
-
-async function loadPublicSpots() {
-  const res = await fetch('/api/spots', { cache: 'no-store' });
-  const json = await res.json();
-  if (!res.ok || json.success === false) throw new Error(json.error || 'No fue posible cargar destinos.');
-  return json.spots || [];
-}
-
-export default function HomePage() {
-  const [spots, setSpots] = useState<any[]>([]);
-  const [spotsError, setSpotsError] = useState('');
-  const [selectedSpot, setSelectedSpot] = useState<any | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string>('Todas');
-  const [activeSearchQuery, setActiveSearchQuery] = useState<string>('');
-  
-  // Estado de Autenticación
-  const [currentUser, setCurrentUser] = useState<any | null>(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
-  const [authIntent, setAuthIntent] = useState<'LOGIN_ONLY' | 'ADD_SPOT' | 'CUSTOM_TRIP' | null>(null);
-
-  // Modales y Drawers
-  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
-  const [prefilledGemaTitle, setPrefilledGemaTitle] = useState<string>('');
-  const [isCustomTripModalOpen, setIsCustomTripModalOpen] = useState<boolean>(false);
-  const [isMyTripsDrawerOpen, setIsMyTripsDrawerOpen] = useState<boolean>(false);
-  const [isCopilotOpen, setIsCopilotOpen] = useState<boolean>(false);
-  const [copilotInitialPrompt, setCopilotInitialPrompt] = useState<string>('');
-  const [travelLayout,setTravelLayout] = useState<'none' | 'split' | 'map'>('none');
-  const [routeSpots, setRouteSpots] = useState<any[]>([]);
-
-  // Escuchar sesión activa
-  useEffect(() => {
-    let isMounted = true;
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (isMounted) setCurrentUser(session?.user ?? null);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (isMounted) setCurrentUser(session?.user ?? null);
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const fetchSpots = async () => {
-    try { setSpots(await loadPublicSpots()); setSpotsError(''); }
-    catch { setSpotsError('No pudimos cargar los destinos. Intentá nuevamente.'); }
-  };
-
-  useEffect(() => {
-    let active = true;
-    loadPublicSpots().then(data => { if (active) setSpots(data); })
-      .catch(() => { if (active) setSpotsError('No pudimos cargar los destinos. Intentá nuevamente.'); });
-    return () => { active = false; };
-  }, []);
-
-  const handleOpenAuthForLogin = () => {
-    setAuthIntent('LOGIN_ONLY');
-    setIsAuthModalOpen(true);
-  };
-
-  const handleOpenAddSpot = () => {
-    if (!currentUser) {
-      setAuthIntent('ADD_SPOT');
-      setIsAuthModalOpen(true);
-    } else {
-      setIsAddModalOpen(true);
-    }
-  };
-
-  const handleOpenCustomTrip = () => {
-    if (!currentUser) {
-      setAuthIntent('CUSTOM_TRIP');
-      setIsAuthModalOpen(true);
-    } else {
-      setIsCustomTripModalOpen(true);
-    }
-  };
-
-  const handleAuthSuccess = () => {
-    setIsAuthModalOpen(false);
-    if (authIntent === 'ADD_SPOT') {
-      setIsAddModalOpen(true);
-    } else if (authIntent === 'CUSTOM_TRIP') {
-      setIsCustomTripModalOpen(true);
-    }
-    setAuthIntent(null);
-  };
-
-  const handleSignOut = async () => {
-    try {
-      setIsProfileModalOpen(false);
-      await supabase.auth.signOut();
-      setCurrentUser(null);
-    } catch (err) {
-      console.error('Error durante el cierre de sesión:', err);
-    }
-  };
-
-  const filteredSpots = useMemo(() => {
-    return spots.filter((spot) => {
-      const catNorm = normalizeText(spot.category);
-      const titleNorm = normalizeText(spot.title);
-      const descNorm = normalizeText(spot.description);
-      const activeCatNorm = normalizeText(activeCategory);
-
-      let matchesCategory = true;
-      if (activeCatNorm !== 'todas') {
-        if (activeCatNorm === 'gastronomia') {
-          matchesCategory = catNorm.includes('gastronom') || titleNorm.includes('restaurante') || titleNorm.includes('cafe') || titleNorm.includes('soda');
-        } else if (activeCatNorm === 'naturaleza') {
-          matchesCategory = catNorm.includes('naturalez') || titleNorm.includes('playa') || titleNorm.includes('catarata') || titleNorm.includes('mirador');
-        } else if (activeCatNorm === 'aventura') {
-          matchesCategory = catNorm.includes('aventur') || titleNorm.includes('canopy') || titleNorm.includes('surf');
-        } else if (activeCatNorm === 'cultura') {
-          matchesCategory = catNorm.includes('cultur') || titleNorm.includes('museo') || titleNorm.includes('teatro');
-        } else {
-          matchesCategory = catNorm === activeCatNorm;
-        }
-      }
-
-      let matchesQuery = true;
-      if (activeSearchQuery.trim()) {
-        const queryNorm = normalizeText(activeSearchQuery);
-        matchesQuery = titleNorm.includes(queryNorm) || descNorm.includes(queryNorm);
-      }
-
-      return matchesCategory && matchesQuery;
-    });
-  }, [spots, activeCategory, activeSearchQuery]);
-
-  return (
-    <main className="relative w-screen h-screen overflow-hidden bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 select-none">
-      
-      {spotsError && <div role="alert" className="absolute bottom-4 left-4 z-[1000] rounded-xl bg-white p-4 text-sm text-slate-900 shadow-lg">
-        {spotsError} <button onClick={() => void fetchSpots()} className="font-bold underline">Reintentar</button>
-      </div>}
-      {/* 1. MAPA INTERACTIVO */}
-      <div className={`absolute top-0 left-0 right-0 z-0 ${travelLayout==='split' ? 'bottom-[62dvh] md:bottom-0 md:right-[28rem]' : travelLayout==='map' ? 'bottom-20 md:bottom-0 md:right-[28rem]' : 'bottom-0'}`}>
-        <MapWithNoSSR
-          spots={filteredSpots}
-          selectedSpot={selectedSpot}
-          onSelectSpot={(spot: any) => setSelectedSpot(spot)}
-          routeSpots={routeSpots}
-        />
-      </div>
-
-      {/* 2. HEADER MINIMALISTA */}
-      <div className="absolute top-3 left-3 right-3 md:right-auto z-20 flex items-center justify-between md:justify-start gap-2 pointer-events-auto">
-        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 rounded-xl px-2.5 py-1.5 shadow-md flex items-center gap-1.5">
-          <span className="font-extrabold text-xs tracking-tight text-slate-900 dark:text-white">
-            Map<span className="text-emerald-600 dark:text-emerald-400">AI</span>
-          </span>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-        </div>
-
-        <div className="flex items-center gap-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 p-1 rounded-xl shadow-md overflow-x-auto max-w-[180px] sm:max-w-none custom-scrollbar">
-          {['Todas', 'gastronomia', 'naturaleza', 'aventura', 'cultura'].map((cat) => {
-            const isSelected = activeCategory.toLowerCase() === cat.toLowerCase();
-            return (
-              <button
-                key={cat}
-                onClick={() => {
-                  setActiveCategory(cat);
-                  setActiveSearchQuery('');
-                }}
-                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold capitalize whitespace-nowrap transition-all ${
-                  isSelected
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {cat}
-              </button>
-            );
-          })}
-        </div>
-
-        {currentUser ? (
-          <button
-            onClick={() => setIsProfileModalOpen(true)}
-            className="p-1 px-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-bold text-[10px] shadow-md hover:bg-slate-100 transition-all flex items-center gap-1.5"
-            title="Ver mi perfil"
-          >
-            <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-[10px]">
-              {currentUser?.user_metadata?.full_name?.charAt(0)?.toUpperCase() || currentUser?.email?.charAt(0)?.toUpperCase() || 'E'}
-            </div>
-            <span className="hidden sm:inline truncate max-w-[80px]">Mi Perfil</span>
-          </button>
-        ) : (
-          <button
-            onClick={handleOpenAuthForLogin}
-            className="px-2.5 py-1.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-bold text-[10px] shadow-md hover:bg-slate-100 transition-all flex items-center gap-1"
-          >
-            <User className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Ingresar</span>
-          </button>
-        )}
-      </div>
-
-      {/* 3. FABS FLOTANTES COMPACTOS */}
-      <div className="fixed bottom-4 left-3 z-40 flex items-center gap-1.5 pointer-events-auto">
-        <button
-          onClick={() => setIsCopilotOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-emerald-600/30 text-emerald-700 dark:text-emerald-400 font-bold text-[11px] shadow-lg hover:bg-emerald-50 dark:hover:bg-slate-800 active:scale-95 transition-all"
-        >
-          <Bot className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span>Copiloto</span>
-        </button>
-
-        <button
-          onClick={handleOpenCustomTrip}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-950 font-bold text-[11px] shadow-lg hover:brightness-110 active:scale-95 transition-all"
-        >
-          <Compass className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
-          <span>Crear Viaje</span>
-        </button>
-
-        {currentUser && (
-          <button
-            onClick={() => setIsMyTripsDrawerOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-bold text-[11px] shadow-lg hover:bg-slate-100 transition-all"
-          >
-            <BookmarkCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Mis Viajes</span>
-          </button>
-        )}
-
-        <button
-          onClick={handleOpenAddSpot}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-lg active:scale-95 transition-all"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Gema</span>
-        </button>
-
-        {routeSpots.length > 0 && (
-          <button
-            onClick={() => setRouteSpots([])}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 text-rose-600 dark:text-rose-400 font-bold text-[10px] shadow-md hover:bg-rose-50 transition-all"
-          >
-            <Trash2 className="w-3 h-3" />
-            <span>Limpiar</span>
-          </button>
-        )}
-      </div>
-
-      {/* 4. DASHBOARD / PANELS */}
-      <div hidden={travelLayout!=='none'} className="fixed bottom-0 left-0 right-0 z-30 md:absolute md:top-14 md:bottom-auto md:left-auto md:right-3 md:w-80 pointer-events-auto transition-all duration-300">
-        {selectedSpot ? (
-          <SpotDetailCard
-            spot={selectedSpot}
-            onClose={() => setSelectedSpot(null)}
-            currentUser={currentUser}
-            onRequireAuth={handleOpenAuthForLogin}
-          />
-        ) : (
-          <div className="w-full max-h-[38vh] md:max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-t-2xl md:rounded-xl custom-scrollbar shadow-2xl">
-            <DiscoveryHub
-              totalSpotsCount={filteredSpots.length}
-              featuredSpots={filteredSpots.slice(0, 5)}
-              onSelectCategory={(cat) => {
-                setActiveCategory(cat);
-                setActiveSearchQuery('');
-              }}
-              onSelectSpot={(spot) => setSelectedSpot(spot)}
-              onOpenAICopilot={(prompt) => {
-                setCopilotInitialPrompt(prompt);
-                setIsCopilotOpen(true);
-              }}
-              onOpenAddSpotModal={handleOpenAddSpot}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* 5. MODALES Y DRAWERS */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => {
-          setIsAuthModalOpen(false);
-          setAuthIntent(null);
-        }}
-        onSuccess={handleAuthSuccess}
-      />
-
-      <UserProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        currentUser={currentUser}
-        onSignOut={handleSignOut}
-        availableSpots={spots}
-      />
-
-      <CustomTripModal
-        isOpen={isCustomTripModalOpen}
-        onClose={() => setIsCustomTripModalOpen(false)}
-        currentUser={currentUser}
-        availableSpots={spots}
-        onApplyTripToMap={(spotsForRoute) => { setSelectedSpot(null); setRouteSpots(spotsForRoute); }}
-        onRequireAuth={handleOpenAuthForLogin}
-        onOpenAddSpotWithTitle={(title) => {
-          setPrefilledGemaTitle(title);
-          setIsAddModalOpen(true);
-        }}
-      />
-
-      <MyTripsDrawer
-        onTravelLayoutChange={setTravelLayout}
-        availableSpots={spots}
-        isOpen={isMyTripsDrawerOpen}
-        onClose={() => setIsMyTripsDrawerOpen(false)}
-        currentUser={currentUser}
-        onApplyTripToMap={(spotsForRoute) => { setSelectedSpot(null); setRouteSpots(spotsForRoute); }}
-      />
-
-      <AICopilotDrawer
-        isOpen={isCopilotOpen}
-        onClose={() => {
-          setIsCopilotOpen(false);
-          setRouteSpots([]);
-        }}
-        initialPrompt={copilotInitialPrompt}
-        onApplyRouteToMap={(spotsForRoute) => setRouteSpots(spotsForRoute)}
-        onClearRoute={() => setRouteSpots([])}
-      />
-
-      <AddSpotModal
-        isOpen={isAddModalOpen}
-        onClose={() => {
-          setIsAddModalOpen(false);
-          setPrefilledGemaTitle('');
-        }}
-        onSpotAdded={() => { void fetchSpots(); }}
-      />
-
-    </main>
-  );
+import {LanguageSwitch,useLanguage} from '@/lib/i18n';
+import {heroSlides,HERO_INTERVAL} from '@/lib/hero-slides';
+export default function PiHome() {
+ const {t}=useLanguage();
+ const [active,setActive]=useState(0);
+ const [paused,setPaused]=useState(false);
+ const [reduced,setReduced]=useState(false);
+ const [authOpen,setAuthOpen]=useState(false);
+ const [signedIn,setSignedIn]=useState(false);
+ useEffect(()=>{
+  if(new URLSearchParams(window.location.search).has('tripId'))window.location.replace('/explore'+window.location.search);
+  const preference=matchMedia('(prefers-reduced-motion: reduce)');
+  const change=()=>setReduced(preference.matches);change();preference.addEventListener('change',change);
+  const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>setSignedIn(Boolean(session)));
+  return()=>{preference.removeEventListener('change',change);subscription.unsubscribe();};
+ },[]);
+ useEffect(()=>{
+  if(paused||reduced||authOpen)return;
+  const timer=setInterval(()=>{if(!document.hidden)setActive(a=>(a+1)%heroSlides.length);},HERO_INTERVAL);
+  return()=>clearInterval(timer);
+ },[paused,reduced,authOpen]);
+ const next=(direction:number)=>setActive(a=>(a+direction+heroSlides.length)%heroSlides.length);
+ const slide=heroSlides[active];
+ return <main className="pi-home relative isolate flex min-h-[100svh] flex-col overflow-hidden bg-[#103c32] text-white">
+  <div className="absolute inset-0 -z-20" aria-hidden="true">{heroSlides.map((photo,i)=><img key={photo.src} src={photo.src} alt="" fetchPriority={i===0?'high':'auto'} loading={i<2?'eager':'lazy'} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-[1400ms] motion-reduce:transition-none ${active===i?'opacity-100':'opacity-0'}`} style={{objectPosition:photo.position}}/>)}</div>
+  <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(5,37,29,.85)_0%,rgba(5,37,29,.52)_48%,rgba(5,37,29,.12)_100%)]"/>
+  <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#092e29]/80 via-transparent to-black/20"/>
+  <header className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center justify-between gap-4 px-6 py-6 sm:px-10 lg:px-16 lg:py-9">
+   <Link href="/" aria-label="Pi — Inicio" className="flex items-center gap-2 text-4xl font-extrabold tracking-tight"><Compass strokeWidth={1.7} className="h-9 w-9"/>Pi<span className="text-[#deeba9]">.</span></Link>
+   <nav aria-label={t('Navegación principal')} className="flex flex-wrap items-center gap-3 sm:gap-6">
+    <LanguageSwitch light/>
+    <a href="#como-funciona" className="hidden text-sm font-semibold text-white/90 lg:block">{t('Cómo funciona')}</a>
+    <button onClick={()=>signedIn?window.location.assign('/explore?view=profile'):setAuthOpen(true)} className="flex min-h-11 items-center gap-2 rounded-full border border-white/40 px-4 py-2 text-sm font-bold transition hover:bg-white/15"><UserRound size={17}/>{t(signedIn?'Mi cuenta':'Ingresar')}</button>
+   </nav>
+  </header>
+  <section className="mx-auto flex w-full max-w-[1800px] flex-1 flex-col justify-center px-6 pb-12 pt-10 sm:px-10 lg:px-16 lg:py-14">
+   <p className="mb-8 text-[10px] font-extrabold uppercase tracking-[.26em] text-[#e1edb4] sm:mb-10 sm:text-xs">{t('Salí de la rutina. Encontrá tu ruta.')}</p>
+   <h1 className="max-w-[1080px] text-[clamp(2.65rem,5.4vw,6.6rem)] font-bold leading-[1.08] tracking-[-.055em]">{t('Un poquito de aventura.')}<br/><span className="inline-block pt-3">{t('Un montón de')} <span className="text-[#e0eca8]">pura vida.</span></span></h1>
+   <p className="mt-7 max-w-[760px] text-base leading-relaxed text-white/90 sm:mt-10 sm:text-lg lg:text-xl">{t('Montañas, playas y esos rincones que todavía no conocés. Armá un viaje que se sienta muy vos.')}</p>
+   <div className="mt-9 flex flex-wrap gap-3 sm:mt-12">
+    <Link href="/explore" className="flex min-h-16 w-full items-center justify-between gap-10 rounded-2xl bg-[#f5f6ea] px-7 py-5 font-bold text-[#214f43] shadow-lg transition hover:bg-white sm:w-auto sm:min-w-72">{t('Ir al mapa')}<ArrowUpRight size={22}/></Link>
+    <Link href="/explore?view=trips" className="flex min-h-16 w-full items-center justify-center gap-3 rounded-2xl border border-white/40 px-7 py-5 font-bold backdrop-blur-sm transition hover:bg-white/10 sm:w-auto">{t('Mis viajes')}<ArrowRight size={18}/></Link>
+   </div>
+  </section>
+  <footer className="mx-auto flex w-full max-w-[1800px] flex-col justify-between gap-6 px-6 pb-7 sm:px-10 lg:flex-row lg:items-end lg:px-16 lg:pb-10">
+   <div className="flex items-center gap-4"><button aria-label={t('Fotografía anterior')} onClick={()=>next(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/40 hover:bg-white/15"><ArrowLeft size={20}/></button><div className="flex gap-2">{heroSlides.map((p,i)=><button key={p.src} onClick={()=>setActive(i)} aria-label={`${t('Ver fotografía')} ${i+1}`} aria-pressed={active===i} className="flex h-11 items-center px-1"><span className={`block h-2 rounded-full transition-all ${active===i?'w-9 bg-[#dfeaa9]':'w-2 bg-white/45'}`}/></button>)}</div><button aria-label={t('Siguiente fotografía')} onClick={()=>next(1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/40 hover:bg-white/15"><ArrowRight size={20}/></button><span className="text-xs font-bold tracking-widest">0{active+1} <span className="text-white/50">/ 04</span></span><button onClick={()=>{if(reduced){setReduced(false);setPaused(false);}else setPaused(p=>!p);}} aria-label={t(paused||reduced?'Reproducir fotografías':'Pausar fotografías')} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/40">{paused||reduced?<Play size={18}/>:<Pause size={18}/>}</button></div>
+   <div className="max-w-lg text-xs sm:text-right"><p className="font-semibold text-white/95">⌖ {t(slide.title)}</p><a title={t('Fotos optimizadas en WebP; recorte adaptable.')} href={slide.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[10px] leading-relaxed text-white/65 hover:text-white">{t('Fotografía')}: {slide.source} ↗</a></div>
+  </footer>
+  <AuthModal isOpen={authOpen} onClose={()=>setAuthOpen(false)} onSuccess={()=>{setSignedIn(true);setAuthOpen(false);}}/>
+  <section id="como-funciona" className="border-t border-white/15 bg-[#0e392f]/95 px-6 py-8 sm:px-10 lg:px-16"><div className="mx-auto grid max-w-[1660px] gap-5 sm:grid-cols-3">{[['01','Elegí tu próximo destino','Explorá naturaleza, aventura, cultura y gastronomía.'],['02','Armá un viaje a tu medida','Organizá los días, las paradas, tus notas y tu presupuesto.'],['03','Salí a descubrir','Iniciá el viaje, abrí Maps y marcá tus paradas completadas.']].map(([n,title,body])=><div key={n} className="flex gap-4"><span className="text-xs text-[#dfeaa9]">{n}</span><div><h2 className="text-sm font-bold">{t(title)}</h2><p className="mt-1 text-xs leading-relaxed text-white/60">{t(body)}</p></div></div>)}</div></section>
+ </main>;
 }

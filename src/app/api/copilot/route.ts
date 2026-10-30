@@ -57,7 +57,7 @@ function optimizeRouteSequence(spots: any[]): any[] {
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, history = [] } = await req.json();
+    const { prompt, history = [], language = 'es' } = await req.json();
 
     if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 5000 || !Array.isArray(history) || history.length > 20) {
       return NextResponse.json({ error: 'El prompt es requerido.' }, { status: 400 });
@@ -96,7 +96,9 @@ export async function POST(req: NextRequest) {
     ).join('\n');
 
     const systemInstructionText = `
-Eres "MapAI Copilot", un Agente de Viajes experto de Costa Rica, apasionado, servicial, cercano y natural (usa modismos ticos con equilibrio: "Pura vida", "Con mucho gusto", "Te recomiendo").
+Eres "Pi Copilot", un Agente de Viajes experto de Costa Rica, apasionado, servicial, cercano y natural (usa modismos ticos con equilibrio: "Pura vida", "Con mucho gusto", "Te recomiendo").
+
+Idioma de la respuesta: ${language === 'en' ? 'English' : 'español'}. Conserva los nombres propios de lugares.
 
 TU TAREA:
 Responder la consulta del usuario armando una recomendación o itinerario detallado, atractivo y con formato Markdown (encabezados, viñetas, emojis).
