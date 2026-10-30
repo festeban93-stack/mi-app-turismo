@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import TripEditor from './TripEditor';
+import TravelMode from './TravelMode';
 import { 
   X, 
   Route, 
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 
 interface MyTripsDrawerProps {
+  availableSpots?: any[];
   isOpen: boolean;
   onClose: () => void;
   currentUser: any;
@@ -26,10 +28,12 @@ interface MyTripsDrawerProps {
 
 export default function MyTripsDrawer({
   isOpen,
+  availableSpots = [],
   onClose,
   currentUser,
   onApplyTripToMap
 }: MyTripsDrawerProps) {
+  const [travelStops, setTravelStops] = useState<any[] | null>(null);
   const detailRequest = useRef(0);
   const [trips, setTrips] = useState<any[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<any | null>(null);
@@ -39,6 +43,9 @@ export default function MyTripsDrawer({
   const [notice, setNotice] = useState('');
   const [detailError, setDetailError] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+
+  const [previousUser, setPreviousUser] = useState(currentUser?.id);
+  if (previousUser !== currentUser?.id) { setPreviousUser(currentUser?.id); setSelectedTrip(null); setTripSpots([]); setTrips([]); setTravelStops(null); setEditing(false); }
 
   const [previousOpen, setPreviousOpen] = useState(isOpen);
   if (previousOpen !== isOpen) { setPreviousOpen(isOpen); if (isOpen) setLoading(true); }
@@ -70,7 +77,7 @@ export default function MyTripsDrawer({
 
   const handleSelectTrip = async (trip: any) => {
     const request = ++detailRequest.current;
-    setEditing(false); setNotice(''); setDetailError(''); setTripSpots([]);
+    setTravelStops(null); setEditing(false); setNotice(''); setDetailError(''); setTripSpots([]);
     setSelectedTrip(trip);
     setLoading(true);
     try {
@@ -172,12 +179,13 @@ export default function MyTripsDrawer({
           ) : (
             <div className="space-y-3">
               <button
-                onClick={() => { detailRequest.current++; setLoading(false); setSelectedTrip(null); setEditing(false); }}
+                onClick={() => { detailRequest.current++; setLoading(false); setSelectedTrip(null); setTravelStops(null); setEditing(false); }}
                 className="text-xs font-bold text-emerald-600 hover:underline"
               >
                 ← Volver a lista de viajes
               </button>
 
+              {travelStops ? <TravelMode key={`${currentUser.id}:${selectedTrip.id}`} trip={selectedTrip} stops={travelStops} userId={currentUser.id} onRoute={onApplyTripToMap} onExit={() => setTravelStops(null)} /> : <>
               {detailError && <p role="alert" className="text-sm text-red-600">{detailError}</p>}
               {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
               {loading ? <p role="status">Cargando paradas…</p> : editing ? <TripEditor key={selectedTrip.id} trip={selectedTrip} initialStops={tripSpots}
@@ -187,7 +195,8 @@ export default function MyTripsDrawer({
                   onApplyTripToMap(stops.filter(s => s.spots).map(s => s.spots));
                   setNotice('Cambios guardados.');
                 }} /> : <>
-              {selectedTrip.owner_id === currentUser.id && !detailError && <button className="w-full rounded-xl bg-emerald-600 text-white py-2 text-sm font-bold" onClick={() => setEditing(true)}>Editar viaje, ruta y presupuesto</button>}
+              {!detailError && tripSpots.length > 0 && <button className="w-full rounded-xl bg-emerald-600 text-white py-3 text-sm font-bold" onClick={() => setTravelStops(tripSpots.map(s => ({ ...s, spots: availableSpots.find(p => p.id === s.spot_id) || s.spots })))}>▶ Iniciar / continuar viaje</button>}
+              {selectedTrip.owner_id === currentUser.id && !detailError && <button className="w-full rounded-xl border border-emerald-600 text-emerald-700 py-2 text-sm font-bold" onClick={() => setEditing(true)}>Editar viaje, ruta y presupuesto</button>}
               <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-1">
                 <div className="flex items-center justify-between">
                   <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">{selectedTrip.title}</h4>
@@ -246,6 +255,7 @@ export default function MyTripsDrawer({
                   </div>
                 ))}
               </div>
+              </>}
               </>}
             </div>
           )}

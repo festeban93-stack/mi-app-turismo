@@ -341,6 +341,7 @@ export default function HomePage() {
       />
 
       <MyTripsDrawer
+        availableSpots={spots}
         isOpen={isMyTripsDrawerOpen}
         onClose={() => setIsMyTripsDrawerOpen(false)}
         currentUser={currentUser}
