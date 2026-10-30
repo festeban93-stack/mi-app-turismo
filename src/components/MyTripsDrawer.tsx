@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import TripEditor from './TripEditor';
 import { 
   X, 
   Route, 
@@ -29,10 +30,14 @@ export default function MyTripsDrawer({
   currentUser,
   onApplyTripToMap
 }: MyTripsDrawerProps) {
+  const detailRequest = useRef(0);
   const [trips, setTrips] = useState<any[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<any | null>(null);
   const [tripSpots, setTripSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [detailError, setDetailError] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
 
   const [previousOpen, setPreviousOpen] = useState(isOpen);
@@ -64,14 +69,20 @@ export default function MyTripsDrawer({
 
 
   const handleSelectTrip = async (trip: any) => {
+    const request = ++detailRequest.current;
+    setEditing(false); setNotice(''); setDetailError(''); setTripSpots([]);
     setSelectedTrip(trip);
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('trip_spots')
-        .select('*, spots(*)')
-        .eq('trip_id', trip.id)
-        .order('day_number', { ascending: true }).order('order_index', { ascending: true });
+      const [details, metadata] = await Promise.all([
+        supabase.from('trip_spots').select('*, spots(*)').eq('trip_id', trip.id)
+          .order('day_number', { ascending: true }).order('order_index', { ascending: true }),
+        supabase.from('trips').select('*').eq('id', trip.id).single(),
+      ]);
+      if (request !== detailRequest.current) return;
+      const { data, error } = details;
+      if (metadata.error) throw metadata.error;
+      setSelectedTrip(metadata.data);
 
       if (error) throw error;
       if (data) {
@@ -81,8 +92,10 @@ export default function MyTripsDrawer({
       }
     } catch (err) {
       console.error('Error cargando detalles del viaje:', err);
+      if (request !== detailRequest.current) return;
+      setDetailError('No se pudieron cargar las paradas. Volvé a abrir el viaje.');
     } finally {
-      setLoading(false);
+      if (request === detailRequest.current) setLoading(false);
     }
   };
 
@@ -103,7 +116,7 @@ export default function MyTripsDrawer({
   const totalCost = tripSpots.reduce((sum, item) => sum + (parseFloat(item.estimated_cost) || 0), 0);
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 shadow-2xl p-5 flex flex-col justify-between animate-fade-in text-slate-900 dark:text-slate-100 select-none">
+    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 shadow-2xl p-5 flex flex-col justify-between overflow-y-auto animate-fade-in text-slate-900 dark:text-slate-100 select-none">
       
       {/* Header */}
       <div>
@@ -159,12 +172,22 @@ export default function MyTripsDrawer({
           ) : (
             <div className="space-y-3">
               <button
-                onClick={() => setSelectedTrip(null)}
+                onClick={() => { detailRequest.current++; setLoading(false); setSelectedTrip(null); setEditing(false); }}
                 className="text-xs font-bold text-emerald-600 hover:underline"
               >
                 ← Volver a lista de viajes
               </button>
 
+              {detailError && <p role="alert" className="text-sm text-red-600">{detailError}</p>}
+              {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
+              {loading ? <p role="status">Cargando paradas…</p> : editing ? <TripEditor key={selectedTrip.id} trip={selectedTrip} initialStops={tripSpots}
+                onCancel={() => setEditing(false)} onSaved={(updated, stops) => {
+                  setSelectedTrip(updated); setTripSpots(stops); setEditing(false);
+                  setTrips(prev => prev.map(t => t.id === updated.id ? updated : t));
+                  onApplyTripToMap(stops.filter(s => s.spots).map(s => s.spots));
+                  setNotice('Cambios guardados.');
+                }} /> : <>
+              {selectedTrip.owner_id === currentUser.id && !detailError && <button className="w-full rounded-xl bg-emerald-600 text-white py-2 text-sm font-bold" onClick={() => setEditing(true)}>Editar viaje, ruta y presupuesto</button>}
               <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-1">
                 <div className="flex items-center justify-between">
                   <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">{selectedTrip.title}</h4>
@@ -176,10 +199,12 @@ export default function MyTripsDrawer({
                 </div>
                 <div className="flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300 font-bold pt-1">
                   <span>{selectedTrip.duration_days} Días de Viaje</span>
-                  <span>Presupuesto Est: ${totalCost.toLocaleString()}</span>
+                  <span>Costo estimado: {new Intl.NumberFormat('es-CR', { style: 'currency', currency: selectedTrip.currency || 'USD' }).format(totalCost)}</span>
                 </div>
               </div>
 
+              {selectedTrip.budget_limit != null && <p className="text-xs">Presupuesto disponible: {selectedTrip.budget_limit} {selectedTrip.currency || 'USD'}</p>}
+              {selectedTrip.notes && <p className="whitespace-pre-wrap text-sm">{selectedTrip.notes}</p>}
               {/* Acciones de Exportación / Compartir */}
               <div className="flex gap-2">
                 <button
@@ -210,15 +235,18 @@ export default function MyTripsDrawer({
                         Día {item.day_number}
                       </span>
                       <strong className="text-slate-900 dark:text-white">
-                        {item.spots ? item.spots.title : item.custom_title}
+                        {item.custom_title || item.spots?.title}
                       </strong>
+                      {item.custom_address && <p className="text-xs text-slate-500 whitespace-normal">{item.custom_address}</p>}
+                      {item.notes && <p className="text-xs whitespace-pre-wrap">{item.notes}</p>}
                     </div>
                     <span className="font-bold text-emerald-600 text-[11px]">
-                      ${item.estimated_cost || 0}
+                      {item.estimated_cost || 0} {selectedTrip.currency || 'USD'}
                     </span>
                   </div>
                 ))}
               </div>
+              </>}
             </div>
           )}
         </div>
