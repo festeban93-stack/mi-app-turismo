@@ -1,58 +1,39 @@
+import { randomUUID } from 'node:crypto';
+import sharp from 'sharp';
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { requireAccess, consumeQuota, serviceClient } from '@/lib/server/access';
+import { BodyError, limitedRequest } from '@/lib/server/body';
+
+export const runtime = 'nodejs';
+const MAX_FILE = 5 * 1024 * 1024;
 
 export async function POST(request: Request) {
+  const access = await requireAccess(request);
+  if (access instanceof Response) return access;
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-    if (!supabaseUrl || !serviceKey) {
-      return NextResponse.json({ success: false, error: 'Configuración de Supabase no encontrada.' }, { status: 400 });
-    }
-
-    const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-
-    if (!file) {
-      return NextResponse.json({ success: false, error: 'No se recibió ninguna imagen.' }, { status: 400 });
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
-
-    // Formatear nombre único para la imagen
-    const fileExt = file.name.split('.').pop() || 'jpg';
-    const fileName = `spot_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-    const filePath = `uploads/${fileName}`;
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    // Subir archivo al bucket 'spot-images'
-    const { data, error } = await supabaseAdmin
-      .storage
-      .from('spot-images')
-      .upload(filePath, buffer, {
-        contentType: file.type || 'image/jpeg',
-        upsert: true
-      });
-
-    if (error) {
-      console.error('Error al subir a Supabase Storage:', error);
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-    }
-
-    // Obtener la URL pública de la imagen guardada
-    const { data: publicUrlData } = supabaseAdmin
-      .storage
-      .from('spot-images')
-      .getPublicUrl(filePath);
-
-    return NextResponse.json({
-      success: true,
-      imageUrl: publicUrlData.publicUrl
-    }, { status: 200 });
-
-  } catch (err: any) {
-    console.error('Excepción en /api/upload:', err);
-    return NextResponse.json({ success: false, error: err?.message || 'Error al procesar la imagen' }, { status: 500 });
+    const denied = await consumeQuota(access.user.id, 'upload');
+    if (denied) return denied;
+    const form = await (await limitedRequest(request, MAX_FILE + 64 * 1024)).formData();
+    const file = form.get('file');
+    if (!(file instanceof File)) throw new BodyError('Seleccioná una imagen.');
+    if (file.size > MAX_FILE) throw new BodyError('La imagen supera los 5 MB.', 413);
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new BodyError('Usá una imagen JPEG, PNG o WebP.', 415);
+    // Decode actual bytes and re-encode: filenames/MIME alone are not trusted.
+    let buffer: Buffer;
+    try {
+      const image = sharp(Buffer.from(await file.arrayBuffer()), { limitInputPixels: 25_000_000, animated: false });
+      const metadata = await image.metadata();
+      if (!['jpeg', 'png', 'webp'].includes(metadata.format || '')) throw new Error('Formato inválido');
+      buffer = await image.rotate().resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true }).webp({ quality: 85 }).toBuffer();
+    } catch { throw new BodyError('El archivo no es una imagen válida o excede los límites de resolución.', 415); }
+    const db = serviceClient();
+    const path = `uploads/${access.user.id}/${randomUUID()}.webp`;
+    const { error } = await db.storage.from('spot-images').upload(path, buffer, { contentType: 'image/webp', upsert: false });
+    if (error) throw error;
+    const { data } = db.storage.from('spot-images').getPublicUrl(path);
+    return NextResponse.json({ success: true, imageUrl: data.publicUrl }, { status: 201 });
+  } catch (error) {
+    console.error('Upload failed', error instanceof BodyError ? error.message : 'Storage unavailable');
+    return NextResponse.json({ success: false, error: error instanceof BodyError ? error.message : 'No fue posible subir la imagen.' }, { status: error instanceof BodyError ? error.status : 503 });
   }
 }

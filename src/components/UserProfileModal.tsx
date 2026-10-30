@@ -37,14 +37,10 @@ export default function UserProfileModal({
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && currentUser) {
-      fetchUserProfile();
-    }
-  }, [isOpen, currentUser]);
+  const [previousOpen, setPreviousOpen] = useState(isOpen);
+  if (previousOpen !== isOpen) { setPreviousOpen(isOpen); if (isOpen) setLoading(true); }
 
-  const fetchUserProfile = async () => {
-    setLoading(true);
+  async function fetchUserProfile() {
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -57,7 +53,7 @@ export default function UserProfileModal({
         .select('id', { count: 'exact', head: true })
         .eq('user_id', currentUser.id);
 
-      setProfileData({
+      return {
         ...profile,
         spotsCount: userSpotsCount || 0,
         fullName: profile?.full_name || currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || 'Explorador',
@@ -65,13 +61,22 @@ export default function UserProfileModal({
         email: currentUser?.email,
         points: profile?.points || 50,
         role: profile?.role || 'explorer'
-      });
+      };
     } catch (err) {
       console.error('Error cargando perfil:', err);
-    } finally {
-      setLoading(false);
+
     }
   };
+
+
+  useEffect(() => {
+    if (isOpen && currentUser) {
+      let active = true;
+      fetchUserProfile().then(data => { if (active) { if (data) setProfileData(data); setLoading(false); } });
+      return () => { active = false; };
+    }
+  }, [isOpen, currentUser]);
+
 
   const handleLogoutClick = async () => {
     setIsSigningOut(true);

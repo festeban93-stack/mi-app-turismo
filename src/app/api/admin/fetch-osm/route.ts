@@ -1,12 +1,16 @@
+import { readJSON } from '@/lib/server/body';
+import { requireAccess } from '@/lib/server/access';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
+  const access = await requireAccess(req, true);
+  if (access instanceof Response) return access;
   try {
-    const { bbox, regionName } = await req.json();
+    const { bbox, regionName } = await readJSON(req);
 
-    if (!bbox || !Array.isArray(bbox) || bbox.length !== 4) {
+    if (!bbox || !Array.isArray(bbox) || bbox.length !== 4 || !bbox.every((value: unknown) => typeof value === 'number' && Number.isFinite(value)) || bbox[0] < -90 || bbox[2] > 90 || bbox[1] < -180 || bbox[3] > 180 || bbox[0] >= bbox[2] || bbox[1] >= bbox[3]) {
       return NextResponse.json({ error: 'BBox inválido' }, { status: 400 });
     }
 
@@ -52,13 +56,14 @@ export async function POST(req: NextRequest) {
 
         return {
           title: el.tags.name,
-          description: el.tags.description || `Gema turística verificada en ${addressText}, Costa Rica.`,
+          description: el.tags.description || `Punto turístico importado de OpenStreetMap en ${addressText}, Costa Rica.`,
           category,
           latitude: el.lat,
           longitude: el.lon,
           address_text: addressText,
-          opening_hours: el.tags.opening_hours || '08:00 - 17:00',
-          entry_fee: 'Acceso público / Consumo local'
+          opening_hours: el.tags.opening_hours || 'Sin confirmar',
+          entry_fee: 'Sin confirmar',
+          is_verified: false, verification_status: 'pending', source_type: 'crowdsourcing', metadata: { import_origin: 'osm' }
         };
       });
 

@@ -1,4 +1,5 @@
 "use client";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
 
 import { useEffect, useRef, useState } from "react";
 
@@ -37,7 +38,7 @@ export default function Chat() {
     setPending(true);
 
     try {
-      const response = await fetch("/api/chat", {
+      const response = await authenticatedFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: nextMessages }),
@@ -57,13 +58,13 @@ export default function Chat() {
         ...current,
         { role: "assistant", content: reply },
       ]);
-    } catch {
+    } catch (error) {
       setMessages((current) => [
         ...current,
         {
           role: "assistant",
           content:
-            "No hay conexión con el servidor de chat. Cuando el API esté arriba, usará OpenAI o Gemini automáticamente.",
+            error instanceof Error ? error.message : 'No fue posible consultar el chat.',
         },
       ]);
     } finally {

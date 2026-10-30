@@ -1,6 +1,8 @@
 'use client';
+import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 import React, { useState, useEffect } from 'react';
+import { saveTrip } from '@/lib/save-trip';
 import { supabase } from '@/lib/supabase';
 import { 
   X, 
@@ -54,7 +56,7 @@ export default function AICopilotDrawer({
 
   if (!isOpen) return null;
 
-  const handleSendMessage = async (textToSend?: string) => {
+  async function handleSendMessage(textToSend?: string) {
     const promptText = textToSend || inputPrompt;
     if (!promptText.trim() || loading) return;
 
@@ -65,7 +67,7 @@ export default function AICopilotDrawer({
     setLoading(true);
 
     try {
-      const res = await fetch('/api/copilot', {
+      const res = await authenticatedFetch('/api/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -75,6 +77,7 @@ export default function AICopilotDrawer({
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.reply || 'Servicio no disponible.');
 
       if (data?.reply) {
         const assistantMsg: Message = {
@@ -94,7 +97,7 @@ export default function AICopilotDrawer({
         ...prev,
         {
           role: 'assistant',
-          content: 'Ocurrió un pequeño inconveniente al consultar las gemas. Por favor intentá de nuevo.'
+          content: err instanceof Error ? err.message : 'No fue posible consultar destinos.'
         }
       ]);
     } finally {
@@ -116,31 +119,14 @@ export default function AICopilotDrawer({
     try {
       const tripTitle = `Viaje IA: ${originalPrompt.slice(0, 25)}...`;
 
-      const { data: tripData, error: tripError } = await supabase
-        .from('trips')
-        .insert([
-          {
-            owner_id: session.user.id,
-            title: tripTitle,
-            duration_days: Math.ceil(spots.length / 2) || 1,
-            is_ai_generated: true,
-            ai_prompt: originalPrompt
-          }
-        ])
-        .select()
-        .single();
-
-      if (tripError) throw tripError;
-
-      const spotsPayload = spots.map((spot, index) => ({
-        trip_id: tripData.id,
-        spot_id: spot.id,
-        day_number: Math.floor(index / 2) + 1,
-        order_index: index,
-        estimated_cost: parseFloat(spot.entry_fee?.match(/\d+/g)?.[0] || '0')
-      }));
-
-      await supabase.from('trip_spots').insert(spotsPayload);
+      await saveTrip({
+        title: tripTitle, durationDays: Math.ceil(spots.length / 2) || 1,
+        aiPrompt: originalPrompt,
+        stops: spots.map((spot, index) => ({
+          spot_id: spot.id, day_number: Math.floor(index / 2) + 1,
+          order_index: index, estimated_cost: 0,
+        })),
+      });
 
       setSavedSuccessMsg('¡Viaje guardado en "Mis Viajes"!');
       setTimeout(() => setSavedSuccessMsg(null), 3000);

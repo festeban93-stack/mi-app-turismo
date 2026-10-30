@@ -1,4 +1,7 @@
-﻿import { NextResponse } from 'next/server';
+import { readJSON } from '@/lib/server/body';
+import { validCoordinates } from '@/lib/server/spots';
+import { requireAccess } from '@/lib/server/access';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Extractor de respaldo para JSON estricto
@@ -14,16 +17,14 @@ function extractJSON(text: string) {
 
 // Sanitizador de Coordenadas Geográficas PostGIS
 function parseCoordinate(value: any, fallback: number): number {
-  if (typeof value === 'number' && !isNaN(value)) return value;
-  if (typeof value === 'string') {
-    const cleaned = value.replace(/[^0-9.-]/g, '');
-    const parsed = parseFloat(cleaned);
-    if (!isNaN(parsed)) return parsed;
-  }
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value);
   return fallback;
 }
 
 export async function POST(request: Request) {
+  const access = await requireAccess(request, true);
+  if (access instanceof Response) return access;
   try {
     const rawApiKey = process.env.GEMINI_API_KEY || '';
     const apiKey = rawApiKey.replace(/['"]/g, '').trim();
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
     if (!supabaseUrl) {
       return NextResponse.json({
@@ -47,8 +48,9 @@ export async function POST(request: Request) {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
-    const body = await request.json().catch(() => ({}));
-    const canton = body.canton || 'La Fortuna, San Carlos';
+    const body = await readJSON(request);
+    const canton = body.canton;
+    if (typeof canton !== 'string' || !canton.trim() || canton.length > 150) return NextResponse.json({ error: 'Cantón inválido.' }, { status: 400 });
 
     // 1. Descubrimiento Dinámico de Modelos activos
     const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
@@ -61,7 +63,7 @@ export async function POST(request: Request) {
       }, { status: 200 });
     }
 
-    let availableModels = listData?.models
+    const availableModels = listData?.models
       ?.filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
       ?.map((m: any) => m.name.replace('models/', '')) || [];
 
@@ -173,9 +175,10 @@ export async function POST(request: Request) {
 
     // Sanitización y armado de registros
     const rowsToInsert = spotsData.map((spot: any) => {
-      const lat = parseCoordinate(spot.latitude, 9.7489);
-      const lng = parseCoordinate(spot.longitude, -83.7534);
+      const lat = parseCoordinate(spot.latitude, NaN);
+      const lng = parseCoordinate(spot.longitude, NaN);
 
+      if (!validCoordinates(lat, lng)) return null;
       return {
         title: spot.title || 'Punto de Interés Local',
         description: spot.description || 'Atractivo turístico por explorar.',
@@ -184,13 +187,16 @@ export async function POST(request: Request) {
           : 'naturaleza',
         location: `SRID=4326;POINT(${lng} ${lat})`,
         address_text: spot.address_text || canton,
-        opening_hours: spot.opening_hours || 'Lunes a Domingo: 8:00 AM - 5:00 PM',
-        entry_fee: spot.entry_fee || 'Entrada Libre',
+        opening_hours: spot.opening_hours || 'Sin confirmar',
+        entry_fee: spot.entry_fee || 'Sin confirmar',
         source_type: 'ai_scraper',
-        is_verified: true,
+        metadata: { import_origin: 'ai_scraper', security_review_20261029: true },
+        is_verified: false,
+        verification_status: 'pending',
       };
-    });
+    }).filter((spot): spot is NonNullable<typeof spot> => spot !== null);
 
+    if (!rowsToInsert.length) return NextResponse.json({ error: 'No se obtuvieron destinos con coordenadas válidas.' }, { status: 422 });
     const { data: insertedData, error: dbError } = await supabaseAdmin
       .from('spots')
       .insert(rowsToInsert)

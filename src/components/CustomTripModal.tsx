@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { saveTrip } from '@/lib/save-trip';
 import { 
   X, 
   Search, 
@@ -151,51 +151,20 @@ export default function CustomTripModal({
       return;
     }
 
+    if (loading) return;
     setLoading(true);
 
     try {
-      // 1. Crear viaje en Supabase
-      const { data: tripData, error: tripError } = await supabase
-        .from('trips')
-        .insert([
-          {
-            owner_id: currentUser.id,
-            title: tripTitle,
-            duration_days: durationDays
-          }
-        ])
-        .select()
-        .single();
-
-      if (tripError) throw tripError;
-
-      // 2. Insertar paradas con sus costos
-      const spotsPayload = selectedSpots.map((item, index) => ({
-        trip_id: tripData.id,
-        spot_id: item.spot?.id || null,
-        custom_title: item.custom_title || null,
-        custom_address: item.custom_address || null,
-        day_number: item.day,
-        order_index: index,
-        estimated_cost: item.cost || 0
-      }));
-
-      const { error: spotsError } = await supabase
-        .from('trip_spots')
-        .insert(spotsPayload);
-
-      if (spotsError) throw spotsError;
-
-      // 3. Registrar colaboradores
-      if (invitedEmails.length > 0) {
-        const collabPayload = invitedEmails.map(email => ({
-          trip_id: tripData.id,
-          invited_email: email,
-          role: 'editor'
-        }));
-
-        await supabase.from('trip_collaborators').insert(collabPayload);
-      }
+      await saveTrip({
+        title: tripTitle.trim(), durationDays,
+        stops: selectedSpots.map((item, index) => ({
+          spot_id: item.spot?.id || null,
+          custom_title: item.custom_title || null,
+          custom_address: item.custom_address || null,
+          day_number: item.day, order_index: index, estimated_cost: item.cost || 0,
+        })),
+        emails: invitedEmails,
+      });
 
       // Trazar en el mapa
       const routeSpots = selectedSpots.filter(item => item.spot).map(item => item.spot);
@@ -252,7 +221,7 @@ export default function CustomTripModal({
             <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto animate-bounce" />
             <div className="space-y-1">
               <h4 className="text-base font-extrabold text-slate-900 dark:text-white">
-                ¡Viaje "{tripTitle}" Creado!
+                ¡Viaje &quot;{tripTitle}&quot; Creado!
               </h4>
               <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xs mx-auto leading-relaxed">
                 Costo Total Estimado: <strong className="text-emerald-600 dark:text-emerald-400">${totalTripCost.toLocaleString()}</strong>. La ruta ha sido cargada en tu mapa interactivo.

@@ -1,3 +1,6 @@
+import { requireAI } from '@/lib/server/access';
+import { readJSON } from '@/lib/server/body';
+import { coordinatesForSpot } from '@/lib/server/coordinates';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -11,51 +14,6 @@ function normalizeText(text: string = ''): string {
     .trim();
 }
 
-// Decodificador WKB de PostGIS para garantizar lat/lng numericas
-function parseCoordinates(spot: any): { lat: number; lng: number } {
-  const rawLat = parseFloat(spot.latitude);
-  const rawLng = parseFloat(spot.longitude);
-  if (!isNaN(rawLat) && !isNaN(rawLng) && rawLat !== 0 && rawLng !== 0) {
-    return { lat: rawLat, lng: rawLng };
-  }
-
-  const loc = spot.location;
-  if (!loc) return { lat: 9.7489, lng: -83.7534 };
-
-  if (typeof loc === 'object' && Array.isArray(loc.coordinates)) {
-    const lng = parseFloat(loc.coordinates[0]);
-    const lat = parseFloat(loc.coordinates[1]);
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
-  }
-
-  if (typeof loc === 'string') {
-    const wktMatch = loc.match(/POINT\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
-    if (wktMatch) {
-      const lng = parseFloat(wktMatch[1]);
-      const lat = parseFloat(wktMatch[2]);
-      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
-    }
-
-    if (/^[0-9a-fA-F]+$/.test(loc) && loc.length >= 42) {
-      try {
-        const buf = Buffer.from(loc, 'hex');
-        const isLittle = buf[0] === 1;
-        const rawType = isLittle ? buf.readUInt32LE(1) : buf.readUInt32BE(1);
-        const hasSRID = (rawType & 0x20000000) !== 0;
-        const offset = 1 + 4 + (hasSRID ? 4 : 0);
-
-        const lng = isLittle ? buf.readDoubleLE(offset) : buf.readDoubleBE(offset);
-        const lat = isLittle ? buf.readDoubleLE(offset + 8) : buf.readDoubleBE(offset + 8);
-        if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
-      } catch (e) {
-        // Fallback a coordenadas por defecto
-      }
-    }
-  }
-
-  return { lat: 9.7489, lng: -83.7534 };
-}
-
 const REGION_KEYWORDS: Record<string, string[]> = {
   guanacaste: ['guanacaste', 'tamarindo', 'liberia', 'flamingo', 'conchal', 'nosara', 'samara', 'santa cruz', 'papagayo', 'herradura', 'avellanas', 'playa'],
   fortuna: ['fortuna', 'arenal', 'san carlos', 'volcan', 'aguas termales', 'la fortuna', 'venado'],
@@ -66,16 +24,18 @@ const REGION_KEYWORDS: Record<string, string[]> = {
 };
 
 export async function POST(request: Request) {
+  const denied = await requireAI(request);
+  if (denied) return denied;
   try {
-    const { prompt } = await request.json();
+    const { prompt } = await readJSON(request, 32 * 1024);
 
-    if (!prompt || !prompt.trim()) {
+    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 5000) {
       return NextResponse.json({ success: false, error: 'El prompt es obligatorio.' }, { status: 400 });
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+    const geminiApiKey = process.env.GEMINI_API_KEY || '';
 
     if (!supabaseUrl || !serviceKey) {
       return NextResponse.json({ success: false, error: 'Configuracion de Supabase no disponible.' }, { status: 500 });
@@ -85,18 +45,19 @@ export async function POST(request: Request) {
 
     const { data: allSpotsRaw } = await supabase
       .from('spots')
-      .select('*')
+      .select('*').eq('is_verified', true).eq('verification_status', 'approved')
       .order('created_at', { ascending: false });
 
     // Parseo de coordenadas WKB
     const cleanSpots = (allSpotsRaw || []).map((spot: any) => {
-      const coords = parseCoordinates(spot);
+      const coords = coordinatesForSpot(spot);
+      if (!coords) return null;
       return {
         ...spot,
         latitude: coords.lat,
         longitude: coords.lng,
       };
-    });
+    }).filter((spot): spot is NonNullable<typeof spot> => spot !== null);
 
     const promptNorm = normalizeText(prompt);
     let matchedRegionKeywords: string[] = [];

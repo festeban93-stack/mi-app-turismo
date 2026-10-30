@@ -30,8 +30,16 @@ function normalizeText(text: string = ''): string {
     .trim();
 }
 
+async function loadPublicSpots() {
+  const res = await fetch('/api/spots', { cache: 'no-store' });
+  const json = await res.json();
+  if (!res.ok || json.success === false) throw new Error(json.error || 'No fue posible cargar destinos.');
+  return json.spots || [];
+}
+
 export default function HomePage() {
   const [spots, setSpots] = useState<any[]>([]);
+  const [spotsError, setSpotsError] = useState('');
   const [selectedSpot, setSelectedSpot] = useState<any | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('Todas');
   const [activeSearchQuery, setActiveSearchQuery] = useState<string>('');
@@ -70,18 +78,15 @@ export default function HomePage() {
   }, []);
 
   const fetchSpots = async () => {
-    try {
-      const res = await fetch(`/api/spots?t=${Date.now()}`, { cache: 'no-store' });
-      const json = await res.json();
-      const rawSpots = Array.isArray(json) ? json : (json.spots || json.data || []);
-      setSpots(rawSpots);
-    } catch (err) {
-      console.error('Error cargando spots:', err);
-    }
+    try { setSpots(await loadPublicSpots()); setSpotsError(''); }
+    catch { setSpotsError('No pudimos cargar los destinos. Intentá nuevamente.'); }
   };
 
   useEffect(() => {
-    fetchSpots();
+    let active = true;
+    loadPublicSpots().then(data => { if (active) setSpots(data); })
+      .catch(() => { if (active) setSpotsError('No pudimos cargar los destinos. Intentá nuevamente.'); });
+    return () => { active = false; };
   }, []);
 
   const handleOpenAuthForLogin = () => {
@@ -162,6 +167,9 @@ export default function HomePage() {
   return (
     <main className="relative w-screen h-screen overflow-hidden bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 select-none">
       
+      {spotsError && <div role="alert" className="absolute bottom-4 left-4 z-[1000] rounded-xl bg-white p-4 text-sm text-slate-900 shadow-lg">
+        {spotsError} <button onClick={() => void fetchSpots()} className="font-bold underline">Reintentar</button>
+      </div>}
       {/* 1. MAPA INTERACTIVO */}
       <div className="absolute inset-0 z-0">
         <MapWithNoSSR
@@ -356,10 +364,7 @@ export default function HomePage() {
           setIsAddModalOpen(false);
           setPrefilledGemaTitle('');
         }}
-        onSpotAdded={(newSpot) => {
-          setSpots((prev) => [newSpot, ...prev]);
-          setSelectedSpot(newSpot);
-        }}
+        onSpotAdded={() => { void fetchSpots(); }}
       />
 
     </main>

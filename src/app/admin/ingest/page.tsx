@@ -1,6 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import Link from 'next/link';
+import { authenticatedFetch } from '@/lib/authenticated-fetch';
+
+import { supabase } from '@/lib/supabase';
+import React, { useState, useEffect } from 'react';
 import { Database, Play, Sparkles, Loader2, MapPin, CheckCircle2 } from 'lucide-react';
 
 const REGIONS = [
@@ -34,6 +38,38 @@ const CURATED_NATIONAL_SPOTS = [
 ];
 
 export default function AdminIngestPage() {
+  const [role, setRole] = useState<string | null>(null);
+  const [pending, setPending] = useState<Array<{id: string; title: string; description: string; address_text: string; source_type: string; opening_hours: string; entry_fee: string}>>([]);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setRole(data.user?.app_metadata?.role || 'visitor'));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => setRole(session?.user.app_metadata?.role || 'visitor'));
+      return () => data.subscription.unsubscribe();
+  }, []);
+
+  async function loadPending() {
+    try {
+      const response = await authenticatedFetch('/api/admin/spots');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'No fue posible cargar destinos.');
+      setPending(data.spots || []);
+      setReviewError('');
+    } catch (error) { setReviewError(error instanceof Error ? error.message : 'No fue posible cargar destinos.'); }
+  }
+  async function review(id: string, action: 'approve' | 'reject') {
+    setReviewingId(id);
+    try {
+      const response = await authenticatedFetch('/api/admin/verify-spot', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ spot_id: id, action }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'No fue posible revisar el destino.');
+      await loadPending();
+    } catch (error) { setReviewError(error instanceof Error ? error.message : 'No fue posible revisar el destino.'); }
+    finally { setReviewingId(null); }
+  }
+
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -47,7 +83,7 @@ export default function AdminIngestPage() {
     addLog('🚀 Iniciando Carga Instantánea del Dataset Curado Nacional...');
 
     try {
-      const res = await fetch('/api/admin/bulk-spots', {
+      const res = await authenticatedFetch('/api/admin/bulk-spots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ spots: CURATED_NATIONAL_SPOTS })
@@ -56,8 +92,8 @@ export default function AdminIngestPage() {
       const data = await res.json();
 
       if (res.ok) {
-        setTotalCount(prev => prev + CURATED_NATIONAL_SPOTS.length);
-        addLog(`✅ ¡Éxito! Se inyectaron ${CURATED_NATIONAL_SPOTS.length} gemas verificadas en la base de datos.`);
+        setTotalCount(prev => prev + data.insertedCount);
+        addLog(`✅ ¡Éxito! Se inyectaron ${data.insertedCount} destinos pendientes de revisión en la base de datos.`);
       } else {
         addLog(`⚠️ Error inyectando dataset: ${data.error}`);
       }
@@ -78,7 +114,7 @@ export default function AdminIngestPage() {
       addLog(`📍 Consultando ${region.name} a través del Proxy Serverless...`);
 
       try {
-        const res = await fetch('/api/admin/fetch-osm', {
+        const res = await authenticatedFetch('/api/admin/fetch-osm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ bbox: region.bbox, regionName: region.name })
@@ -89,16 +125,16 @@ export default function AdminIngestPage() {
         if (res.ok && data.spots && data.spots.length > 0) {
           addLog(`   📦 Recuperadas ${data.spots.length} gemas de ${region.name}. Insertando en Supabase...`);
 
-          const bulkRes = await fetch('/api/admin/bulk-spots', {
+          const bulkRes = await authenticatedFetch('/api/admin/bulk-spots', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ spots: data.spots })
           });
 
-          if (bulkRes.ok) {
-            setTotalCount(prev => prev + data.spots.length);
-            addLog(`   ✅ Guardadas ${data.spots.length} gemas de ${region.name} en Supabase.`);
-          }
+          const bulkData = await bulkRes.json();
+          if (!bulkRes.ok) throw new Error(bulkData.error || 'No se guardaron los destinos.');
+          setTotalCount(prev => prev + bulkData.insertedCount);
+          addLog(`   ✅ Guardados ${bulkData.insertedCount} destinos nuevos de ${region.name}, pendientes de revisión.`);
         } else {
           addLog(`   ⚠️ No se encontraron nuevos nodos o la API externa estuvo saturada.`);
         }
@@ -112,6 +148,12 @@ export default function AdminIngestPage() {
     addLog('🎉 PROCESO FINALIZADO');
     setRunning(false);
   };
+
+  if (role !== 'admin') return <main className="min-h-screen p-10 text-center">
+    <p>{role === null ? 'Comprobando sesión…' : 'Este panel requiere una cuenta administradora.'}</p>
+    <Link href="/" className="underline">Volver al mapa e iniciar sesión</Link>
+  </main>;
+
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 flex flex-col items-center justify-center font-sans">
@@ -162,6 +204,25 @@ export default function AdminIngestPage() {
             <span>Ingesta Masiva OSM vía Proxy</span>
           </button>
         </div>
+
+        <section className="rounded-2xl border border-slate-700 p-4 space-y-4">
+          <h2 className="font-bold">Destinos pendientes de revisión</h2>
+          <p className="text-sm text-slate-300">Revisá la ubicación, la fuente, los horarios y las tarifas antes de aprobar. Aprobar publica el destino en el mapa.</p>
+          <button onClick={() => void loadPending()} className="rounded-lg bg-slate-700 px-4 py-2">Actualizar pendientes</button>
+          {reviewError && <p role="alert" className="text-amber-300">{reviewError}</p>}
+          {pending.map(spot => <article key={spot.id} className="rounded-xl border border-slate-700 p-4 space-y-2">
+            <h3 className="font-bold">{spot.title}</h3>
+            <p className="text-sm">{spot.description}</p>
+            <p className="text-sm">{spot.address_text} · Fuente: {spot.source_type}</p>
+            <p className="text-sm">Horario: {spot.opening_hours} · Tarifa: {spot.entry_fee}</p>
+            <a target="_blank" rel="noopener noreferrer" className="block text-sm underline" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(spot.title + ' ' + spot.address_text + ' Costa Rica')}`}>Comprobar información en Google Maps</a>
+            <div className="flex gap-3">
+              <button disabled={reviewingId !== null} onClick={() => void review(spot.id,'approve')} className="rounded-lg bg-emerald-700 px-4 py-2 disabled:opacity-50">Aprobar y publicar</button>
+              <button disabled={reviewingId !== null} onClick={() => void review(spot.id,'reject')} className="rounded-lg bg-red-800 px-4 py-2 disabled:opacity-50">Rechazar</button>
+            </div>
+          </article>)}
+          {!pending.length && <p className="text-sm text-slate-400">Usá Actualizar pendientes para consultar la cola.</p>}
+        </section>
 
         {/* Consola de Progreso en Vivo */}
         <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 h-64 overflow-y-auto font-mono text-xs space-y-1.5 custom-scrollbar">

@@ -1,10 +1,14 @@
+import { requireAccess } from '@/lib/server/access';
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { serviceClient } from '@/lib/server/access';
 
 export const maxDuration = 60; // Extender timeout en Next.js / Vercel
 
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
+  const access = await requireAccess(req, true);
+  if (access instanceof Response) return access;
   try {
+    const supabase = serviceClient();
     const overpassQuery = `
       [out:json][timeout:60];
       (
@@ -45,11 +49,11 @@ export async function GET(req: NextRequest) {
           title: el.tags.name,
           description: el.tags.description || `Punto turístico en ${el.tags['addr:city'] || 'Costa Rica'}.`,
           category,
-          latitude: el.lat,
-          longitude: el.lon,
+          location: `SRID=4326;POINT(${el.lon} ${el.lat})`,
           address_text: el.tags['addr:city'] || el.tags['addr:province'] || 'Costa Rica',
-          opening_hours: el.tags.opening_hours || '08:00 - 17:00',
-          entry_fee: 'Acceso público / Consumo local'
+          opening_hours: el.tags.opening_hours || 'Sin confirmar',
+          entry_fee: 'Sin confirmar',
+          is_verified: false, verification_status: 'pending', source_type: 'crowdsourcing', metadata: { import_origin: 'osm' }
         };
       });
 

@@ -1,3 +1,5 @@
+import { requireAI } from '@/lib/server/access';
+import { readJSON } from '@/lib/server/body';
 import { places } from "@/data/places";
 
 type ChatMessage = {
@@ -89,10 +91,15 @@ async function replyWithGemini(messages: ChatMessage[], apiKey: string) {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { messages?: ChatMessage[] };
-  const messages = (body.messages ?? []).filter(
-    (message) => message.role === "user" || message.role === "assistant",
-  );
+  const denied = await requireAI(request);
+  if (denied) return denied;
+  let messages: ChatMessage[];
+  try {
+    const body = await readJSON(request, 32 * 1024);
+    if (!Array.isArray(body.messages) || body.messages.length > 20) throw new Error();
+    messages = body.messages.filter((message: ChatMessage) => message && (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string' && message.content.length <= 5000);
+    if (!messages.length) throw new Error();
+  } catch { return Response.json({ error: 'Mensajes inválidos o demasiado extensos.' }, { status: 400 }); }
 
   const openaiKey = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;

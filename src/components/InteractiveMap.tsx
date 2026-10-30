@@ -1,5 +1,7 @@
 ﻿'use client';
 
+import { supabase } from '@/lib/supabase';
+import type { User } from '@supabase/supabase-js';
 import { useEffect, useState, useRef } from 'react';
 import CopilotWidget from './CopilotWidget';
 import AddPlaceModal from './AddPlaceModal';
@@ -20,14 +22,14 @@ interface Place {
 }
 
 export default function InteractiveMap() {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [places, setPlaces] = useState<Place[]>([]);
   const [allPlacesBackup, setAllPlacesBackup] = useState<Place[]>([]);
   const [selectedRegion, setSelectedRegion] = useState('Todas');
   const [selectedCategory, setSelectedCategory] = useState('Todas');
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [loading, setLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
   const [isItineraryOpen, setIsItineraryOpen] = useState(false);
@@ -40,69 +42,39 @@ export default function InteractiveMap() {
   const categories = ['Todas', 'Naturaleza', 'Gastronomía', 'Aventura', 'Cultura'];
 
   useEffect(() => {
-    setMounted(true);
+    supabase.auth.getSession().then(({ data }) => setCurrentUser(data.session?.user || null));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => setCurrentUser(session?.user || null));
+    return () => data.subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (!mounted) return;
-
-    if (document.getElementById('leaflet-css')) {
-      initMap();
-      return;
-    }
-
-    const link = document.createElement('link');
-    link.id = 'leaflet-css';
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.async = true;
-    script.onload = () => {
-      initMap();
-    };
-    document.body.appendChild(script);
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-  }, [mounted]);
-
-  const initMap = () => {
-    if (!window.L || mapRef.current) return;
-
+  const updateMarkers = (items: Place[]) => {
+    if (!window.L || !mapRef.current) return;
     const L = window.L;
-    const map = L.map('map-container', {
-      center: [9.9281, -84.0907],
-      zoom: 8,
-      zoomControl: true
+
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    items.forEach((place) => {
+      const [lng, lat] = place.location?.coordinates || [];
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const marker = L.marker([lat, lng]).addTo(mapRef.current);
+      const popupContent = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = place.name;
+      const description = document.createElement('p');
+      description.textContent = place.short_description;
+      popupContent.append(title, description);
+      marker.bindPopup(popupContent);
+
+      marker.on('click', () => {
+        setSelectedPlace(place);
+      });
+
+      markersRef.current.push(marker);
     });
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 18,
-    }).addTo(map);
-
-    map.on('click', (e: any) => {
-      setClickedLatLng({ lat: e.latlng.lat, lng: e.latlng.lng });
-    });
-
-    mapRef.current = map;
-    fetchPlaces();
   };
 
-  useEffect(() => {
-    if (mapRef.current) {
-      fetchPlaces();
-    }
-  }, [selectedRegion, selectedCategory]);
-
-  const fetchPlaces = async () => {
+  async function fetchPlaces() {
     setLoading(true);
     const params = new URLSearchParams();
     if (selectedRegion !== 'Todas') params.append('region', selectedRegion);
@@ -133,39 +105,66 @@ export default function InteractiveMap() {
     }
   };
 
-  const updateMarkers = (items: Place[]) => {
-    if (!window.L || !mapRef.current) return;
+  function initMap() {
+    if (!window.L || mapRef.current) return;
+
     const L = window.L;
-
-    markersRef.current.forEach((m) => m.remove());
-    markersRef.current = [];
-
-    items.forEach((place) => {
-      let lat = 9.9331;
-      let lng = -84.0768;
-
-      if (place.location && place.location.coordinates) {
-        lng = place.location.coordinates[0];
-        lat = place.location.coordinates[1];
-      }
-
-      const marker = L.marker([lat, lng]).addTo(mapRef.current);
-      
-      const popupContent = `
-        <div style="font-family: sans-serif; padding: 4px;">
-          <strong style="font-size: 14px; color: #0f172a;">${place.name}</strong>
-          <p style="font-size: 11px; color: #475569; margin-top: 2px;">${place.short_description}</p>
-        </div>
-      `;
-      marker.bindPopup(popupContent);
-      
-      marker.on('click', () => {
-        setSelectedPlace(place);
-      });
-
-      markersRef.current.push(marker);
+    const map = L.map('map-container', {
+      center: [9.9281, -84.0907],
+      zoom: 8,
+      zoomControl: true
     });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 18,
+    }).addTo(map);
+
+    map.on('click', (e: any) => {
+      setClickedLatLng({ lat: e.latlng.lat, lng: e.latlng.lng });
+    });
+
+    mapRef.current = map;
+    fetchPlaces();
   };
+
+
+  useEffect(() => {
+    if (document.getElementById('leaflet-css')) {
+      initMap();
+      return;
+    }
+
+    const link = document.createElement('link');
+    link.id = 'leaflet-css';
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.async = true;
+    script.onload = () => {
+      initMap();
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+
+  useEffect(() => {
+    if (mapRef.current) {
+      fetchPlaces();
+    }
+  }, [selectedRegion, selectedCategory]);
+
+
 
   const handleFilterFromCopilot = (matchedIds: string[]) => {
     const filtered = allPlacesBackup.filter((p) => matchedIds.includes(p.id));
@@ -188,14 +187,6 @@ export default function InteractiveMap() {
     setSelectedPlace(newPlace);
   };
 
-  if (!mounted) {
-    return (
-      <div className="w-full h-screen bg-slate-950 flex flex-col items-center justify-center text-emerald-400 font-sans gap-3">
-        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm">Iniciando MapAI Costa Rica...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="relative w-full h-screen flex flex-col md:flex-row overflow-hidden bg-slate-950 text-white font-sans">
@@ -260,7 +251,7 @@ export default function InteractiveMap() {
               </span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">{selectedPlace.short_description}</p>
-            
+
             <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-700/60 mt-1">
               <span className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1 mb-1">
                 ✨ Guía Virtual IA
@@ -274,7 +265,7 @@ export default function InteractiveMap() {
             </div>
 
             <button
-              onClick={() => setIsClaimModalOpen(true)}
+              onClick={() => currentUser ? setIsClaimModalOpen(true) : alert('Iniciá sesión desde el mapa principal para reclamar un negocio.')}
               className="mt-2 w-full bg-slate-900 hover:bg-slate-800 border border-amber-500/50 hover:border-amber-400 text-amber-300 font-semibold py-2 px-3 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 shadow"
             >
               <span>🏆</span> ¿Eres el dueño? Reclamar Negocio
@@ -312,8 +303,10 @@ export default function InteractiveMap() {
         <ClaimBusinessModal
           isOpen={isClaimModalOpen}
           onClose={() => setIsClaimModalOpen(false)}
-          placeName={selectedPlace.name}
-          placeId={selectedPlace.id}
+          key={selectedPlace.id}
+          currentUser={currentUser}
+          initialSpotId={selectedPlace.id}
+          availableSpots={places.map(place => ({ id: place.id, title: place.name }))}
         />
       )}
 

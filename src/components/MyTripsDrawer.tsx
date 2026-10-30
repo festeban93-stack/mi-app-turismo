@@ -35,39 +35,45 @@ export default function MyTripsDrawer({
   const [loading, setLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  const [previousOpen, setPreviousOpen] = useState(isOpen);
+  if (previousOpen !== isOpen) { setPreviousOpen(isOpen); if (isOpen) setLoading(true); }
+
+  async function fetchUserTrips() {
+    try {
+      const { data, error } = await supabase
+        .from('trips')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('Error cargando viajes:', err);
+
+    }
+  };
+
+
   useEffect(() => {
     if (isOpen && currentUser) {
-      fetchUserTrips();
+      let active = true;
+      fetchUserTrips().then(data => { if (active) { if (data) setTrips(data); setLoading(false); } });
+      return () => { active = false; };
     }
   }, [isOpen, currentUser]);
 
-  const fetchUserTrips = async () => {
-    setLoading(true);
-    try {
-      const { data } = await supabase
-        .from('trips')
-        .select('*')
-        .eq('owner_id', currentUser.id)
-        .order('created_at', { ascending: false });
-
-      if (data) setTrips(data);
-    } catch (err) {
-      console.error('Error cargando viajes:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSelectTrip = async (trip: any) => {
     setSelectedTrip(trip);
     setLoading(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('trip_spots')
         .select('*, spots(*)')
         .eq('trip_id', trip.id)
-        .order('day_number', { ascending: true });
+        .order('day_number', { ascending: true }).order('order_index', { ascending: true });
 
+      if (error) throw error;
       if (data) {
         setTripSpots(data);
         const route = data.filter(d => d.spots).map(d => d.spots);

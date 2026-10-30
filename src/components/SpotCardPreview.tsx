@@ -94,7 +94,7 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
           <span className="text-base">🕒</span>
           <div>
             <span className="font-semibold text-slate-400 block text-[10px]">HORARIO DE ATENCIÓN</span>
-            <span>{spot.opening_hours || 'Lunes a Domingo: 8:00 AM - 5:00 PM'}</span>
+            <span>{spot.opening_hours || 'Sin confirmar'}</span>
           </div>
         </div>
 
@@ -102,7 +102,7 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
           <span className="text-base">🎟️</span>
           <div>
             <span className="font-semibold text-slate-400 block text-[10px]">COSTO / ENTRADA</span>
-            <span className="text-emerald-400 font-medium">{spot.entry_fee || 'Entrada Libre / Gratis'}</span>
+            <span className="text-emerald-400 font-medium">{spot.entry_fee || 'Tarifa sin confirmar'}</span>
           </div>
         </div>
 
