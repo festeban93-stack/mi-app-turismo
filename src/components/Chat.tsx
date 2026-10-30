@@ -1,4 +1,5 @@
 "use client";
+import {useLanguage} from '@/lib/i18n';
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 
 import { useEffect, useRef, useState } from "react";
@@ -11,6 +12,7 @@ type ChatMessage = {
 };
 
 export default function Chat() {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
@@ -77,11 +79,11 @@ export default function Chat() {
       {open ? (
         <section
           className="pointer-events-auto flex h-[min(32rem,70vh)] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-teal-900/10 bg-white shadow-2xl shadow-teal-950/20 dark:border-white/10 dark:bg-zinc-950"
-          aria-label="Chat de guía turístico"
+          aria-label={t("Chat de guía turístico")}
         >
           <header className="flex items-center justify-between bg-gradient-to-r from-teal-800 to-cyan-700 px-4 py-3 text-white">
             <div>
-              <p className="text-sm font-semibold">Guía IA</p>
+              <p className="text-sm font-semibold">{t("Guía IA")}</p>
               <p className="text-[11px] text-teal-100">OpenAI · Gemini</p>
             </div>
             <button
@@ -89,8 +91,7 @@ export default function Chat() {
               onClick={() => setOpen(false)}
               className="rounded-full bg-white/15 px-2.5 py-1 text-xs hover:bg-white/25"
             >
-              Minimizar
-            </button>
+              {t(" Minimizar ")}</button>
           </header>
 
           <div className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
@@ -107,7 +108,7 @@ export default function Chat() {
               </p>
             ))}
             {pending ? (
-              <p className="text-xs text-zinc-400">Pensando la ruta…</p>
+              <p className="text-xs text-zinc-400">{t("Pensando la ruta…")}</p>
             ) : null}
             <div ref={bottomRef} />
           </div>
@@ -119,7 +120,7 @@ export default function Chat() {
             <input
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="¿Dónde como un buen casado?"
+              placeholder={t("¿Dónde como un buen casado?")}
               className="min-w-0 flex-1 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm outline-none focus:border-teal-500 dark:border-zinc-700 dark:bg-zinc-900"
             />
             <button
@@ -127,8 +128,7 @@ export default function Chat() {
               disabled={pending || !input.trim()}
               className="rounded-full bg-teal-800 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-40"
             >
-              Enviar
-            </button>
+              {t(" Enviar ")}</button>
           </form>
         </section>
       ) : null}
@@ -138,7 +138,7 @@ export default function Chat() {
         onClick={() => setOpen((value) => !value)}
         className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-teal-700 to-cyan-600 text-white shadow-lg shadow-teal-900/30 hover:scale-105"
         aria-expanded={open}
-        aria-label={open ? "Cerrar chat de IA" : "Abrir chat de IA"}
+        aria-label={open ? t("Cerrar chat de IA") : t("Abrir chat de IA")}
       >
         {open ? "×" : "✦"}
       </button>

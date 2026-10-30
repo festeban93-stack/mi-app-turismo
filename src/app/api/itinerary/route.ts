@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   const denied = await requireAI(request);
   if (denied) return denied;
   try {
-    const { region, days, budget, travel_style } = await readJSON(request, 32 * 1024);
+    const { region, days, budget, travel_style, language } = await readJSON(request, 32 * 1024);
 
     const geminiKey = process.env.GEMINI_API_KEY;
     if (typeof region !== 'string' || region.length > 150 || !Number.isInteger(Number(days)) || Number(days) < 1 || Number(days) > 30 || !Number.isFinite(Number(budget)) || Number(budget) < 0) {
@@ -29,6 +29,7 @@ export async function POST(request: Request) {
       }));
 
       const prompt = `
+        Responde en ${language === 'en' ? 'inglés' : 'español'}, sin traducir nombres propios.
         Crea un itinerario de ${days} días en la región "${region}" en Costa Rica con presupuesto de $${budget} USD y estilo "${travel_style || 'Aventura'}".
         Lugares disponibles: ${JSON.stringify(placesContext)}
 
@@ -74,18 +75,18 @@ export async function POST(request: Request) {
 
       itineraryPlan = Array.from({ length: numDays }).map((_, idx) => ({
         day: idx + 1,
-        theme: `Día ${idx + 1}: Descubriendo ${region}`,
+        theme: language === 'en' ? `Day ${idx + 1}: Discovering ${region}` : `Día ${idx + 1}: Descubriendo ${region}`,
         estimated_daily_cost_usd: dailyBudget,
         activities: [
           {
             time: '08:30 AM',
-            place_name: `Desayuno tradicional y mirador en ${region}`,
-            recommendation: 'Comienza el día con comida típica local y vistas panorámicas de la zona.'
+            place_name: language === 'en' ? `Traditional breakfast and viewpoint in ${region}` : `Desayuno tradicional y mirador en ${region}`,
+            recommendation: language === 'en' ? 'Start the day with local food and panoramic views.' : 'Comienza el día con comida típica local y vistas panorámicas de la zona.'
           },
           {
             time: '01:30 PM',
-            place_name: `Aventura o caminata natural en ${region}`,
-            recommendation: 'Explora senderos, cataratas o rincones locales recomendados por la comunidad.'
+            place_name: language === 'en' ? `Adventure or nature walk in ${region}` : `Aventura o caminata natural en ${region}`,
+            recommendation: language === 'en' ? 'Explore trails, waterfalls or local places recommended by the community.' : 'Explora senderos, cataratas o rincones locales recomendados por la comunidad.'
           }
         ]
       }));

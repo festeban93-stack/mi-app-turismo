@@ -1,4 +1,5 @@
 ﻿'use client';
+import { useLanguage } from '@/lib/i18n';
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
@@ -26,6 +27,7 @@ interface SpotCardPreviewProps {
 }
 
 export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardPreviewProps) {
+  const { t } = useLanguage();
   const [checkinStatus, setCheckinStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [localCheckinCount, setLocalCheckinCount] = useState(spot.checkins_count || 0);
@@ -93,27 +95,26 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
         <div className="flex items-center gap-2 text-slate-300">
           <span className="text-base">🕒</span>
           <div>
-            <span className="font-semibold text-slate-400 block text-[10px]">HORARIO DE ATENCIÓN</span>
-            <span>{spot.opening_hours || 'Sin confirmar'}</span>
+            <span className="font-semibold text-slate-400 block text-[10px]">{t("HORARIO DE ATENCIÓN")}</span>
+            <span>{spot.opening_hours || t("Sin confirmar")}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-slate-300 border-t border-slate-700/50 pt-2">
           <span className="text-base">🎟️</span>
           <div>
-            <span className="font-semibold text-slate-400 block text-[10px]">COSTO / ENTRADA</span>
-            <span className="text-emerald-400 font-medium">{spot.entry_fee || 'Tarifa sin confirmar'}</span>
+            <span className="font-semibold text-slate-400 block text-[10px]">{t("COSTO / ENTRADA")}</span>
+            <span className="text-emerald-400 font-medium">{spot.entry_fee || t("Tarifa sin confirmar")}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-slate-300 border-t border-slate-700/50 pt-2">
           <span className="text-base">📍</span>
           <div>
-            <span className="font-semibold text-slate-400 block text-[10px]">DIRECCIÓN Y UBICACIÓN</span>
+            <span className="font-semibold text-slate-400 block text-[10px]">{t("DIRECCIÓN Y UBICACIÓN")}</span>
             <span>{spot.address_text || 'Costa Rica'}</span>
             <span className="text-[10px] text-cyan-400 block mt-0.5 font-mono">
-              a {(spot.distance_meters / 1000).toFixed(1)} km de ti
-            </span>
+              {t(" a ")}{(spot.distance_meters / 1000).toFixed(1)} {t(" km de ti ")}</span>
           </div>
         </div>
       </div>
@@ -127,8 +128,7 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
       <div className="pt-2 border-t border-slate-800 flex flex-col gap-2">
         <div className="flex justify-between items-center text-xs text-slate-400">
           <span className="flex items-center gap-1">
-            📍 <strong className="text-white">{localCheckinCount}</strong> Exploradores han hecho Check-in
-          </span>
+            📍 <strong className="text-white">{localCheckinCount}</strong> {t(" Exploradores han hecho Check-in ")}</span>
           <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-cyan-300">
             +50 Pts
           </span>
@@ -136,8 +136,7 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
 
         {checkinStatus === 'success' ? (
           <div className="bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs p-2.5 rounded-xl text-center font-semibold">
-            ¡Check-in registrado con éxito! 🎉 +50 Puntos de Explorador.
-          </div>
+            {t(" ¡Check-in registrado con éxito! 🎉 +50 Puntos de Explorador. ")}</div>
         ) : (
           <button
             onClick={handleCheckIn}
@@ -145,11 +144,11 @@ export default function SpotCardPreview({ spot, userCoords, onClose }: SpotCardP
             className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold rounded-xl text-xs shadow-lg shadow-cyan-500/20 hover:opacity-95 transition-all flex justify-center items-center gap-2 disabled:opacity-50"
           >
             {checkinStatus === 'loading' ? (
-              <span>Validando GPS...</span>
+              <span>{t("Validando GPS...")}</span>
             ) : (
               <>
                 <span>📍</span>
-                <span>Hacer Check-in Aquí (Verificar Presencia)</span>
+                <span>{t("Hacer Check-in Aquí (Verificar Presencia)")}</span>
               </>
             )}
           </button>

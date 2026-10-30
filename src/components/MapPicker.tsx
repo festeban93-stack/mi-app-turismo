@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from '@/lib/i18n';
 
 import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
@@ -37,6 +38,7 @@ interface MapPickerProps {
 }
 
 export default function MapPicker({ lat, lng, onChange }: MapPickerProps) {
+  const { t } = useLanguage();
   const currentCenter: [number, number] = [lat || 9.7489, lng || -83.7534];
 
   return (
@@ -56,8 +58,7 @@ export default function MapPicker({ lat, lng, onChange }: MapPickerProps) {
         {lat && lng ? <Marker position={[lat, lng]} icon={pickerIcon} /> : null}
       </MapContainer>
       <div className="absolute bottom-2 left-2 right-2 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] text-slate-300 border border-slate-800 text-center pointer-events-none z-10">
-        👉 Tocá o hacé clic en cualquier punto del mapa para fijar el pin
-      </div>
+        {t(" 👉 Tocá o hacé clic en cualquier punto del mapa para fijar el pin ")}</div>
     </div>
   );
 }

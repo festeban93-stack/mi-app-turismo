@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from '@/lib/i18n';
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -42,6 +43,7 @@ export default function SpotDetailCard({
   currentUser,
   onRequireAuth
 }: SpotDetailCardProps) {
+  const { t } = useLanguage();
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [hasCheckedIn, setHasCheckedIn] = useState(false);
@@ -78,7 +80,7 @@ export default function SpotDetailCard({
   // Control de Audio Guía por sintetizador de voz
   const toggleAudioGuide = () => {
     if (!('speechSynthesis' in window)) {
-      alert('Tu navegador no soporta sintetizador de voz para la audio guía.');
+      alert(t("Tu navegador no soporta sintetizador de voz para la audio guía."));
       return;
     }
 
@@ -140,13 +142,12 @@ export default function SpotDetailCard({
         <div className="space-y-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="px-2 py-0.5 text-[9px] uppercase font-extrabold rounded-md bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
-              {spot.category || 'Naturaleza'}
+              {t(spot.category || 'Naturaleza')}
             </span>
             {distanceKm !== null && (
               <span className="px-2 py-0.5 text-[9px] font-bold rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1">
                 <Compass className="w-2.5 h-2.5 text-emerald-600" />
-                A {distanceKm} km de vos
-              </span>
+                A {distanceKm} {t(" km de vos ")}</span>
             )}
           </div>
           <h3 className="text-sm font-extrabold text-slate-900 dark:text-white leading-snug">
@@ -162,7 +163,7 @@ export default function SpotDetailCard({
         </button>
       </div>
 
-      {currentUser ? <AddDestinationToTrip key={currentUser.id+spot.id} userId={currentUser.id} destination={{spot_id:spot.id,custom_title:spot.title,custom_address:spot.address_text}}/> : <button onClick={onRequireAuth} className="min-h-11 w-full rounded-xl border p-2 text-sm font-bold">Ingresá para agregar a un viaje</button>}
+      {currentUser ? <AddDestinationToTrip key={currentUser.id+spot.id} userId={currentUser.id} destination={{spot_id:spot.id,custom_title:spot.title,custom_address:spot.address_text}}/> : <button onClick={onRequireAuth} className="min-h-11 w-full rounded-xl border p-2 text-sm font-bold">{t("Ingresá para agregar a un viaje")}</button>}
       {/* Botones Principales de Acción (Navegación & Audio) */}
       <div className="grid grid-cols-3 gap-1.5">
         <a
@@ -194,7 +195,7 @@ export default function SpotDetailCard({
           }`}
         >
           {isPlayingAudio ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-          <span>{isPlayingAudio ? 'Pausar' : 'Audio Guía'}</span>
+          <span>{isPlayingAudio ? t("Pausar") : t("Audio Guía")}</span>
         </button>
       </div>
 
@@ -202,15 +203,15 @@ export default function SpotDetailCard({
       <div className="space-y-1.5 text-[11px] text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
         <div className="flex items-center gap-2">
           <Clock className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-          <span><strong>Horario:</strong> {spot.opening_hours || 'Sin confirmar'}</span>
+          <span><strong>{t("Horario:")}</strong> {spot.opening_hours || t("Sin confirmar")}</span>
         </div>
         <div className="flex items-center gap-2">
           <Ticket className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-          <span><strong>Entrada:</strong> {spot.entry_fee || 'Tarifa sin confirmar'}</span>
+          <span><strong>{t("Entrada:")}</strong> {spot.entry_fee || t("Tarifa sin confirmar")}</span>
         </div>
         <div className="flex items-start gap-2">
           <MapPin className="w-3.5 h-3.5 text-rose-500 flex-shrink-0 mt-0.5" />
-          <span><strong>Dirección:</strong> {spot.address_text || 'Costa Rica'}</span>
+          <span><strong>{t("Dirección:")}</strong> {spot.address_text || 'Costa Rica'}</span>
         </div>
       </div>
 
@@ -224,7 +225,7 @@ export default function SpotDetailCard({
         {hasCheckedIn ? (
           <div className="py-2 px-3 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-bold text-xs flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>¡Check-In Realizado! (+10 Pts sumados)</span>
+            <span>{t("¡Check-In Realizado! (+10 Pts sumados)")}</span>
           </div>
         ) : (
           <button
@@ -233,7 +234,7 @@ export default function SpotDetailCard({
             className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Hacer Check-In Aquí (+10 Pts)</span>
+            <span>{t("Hacer Check-In Aquí (+10 Pts)")}</span>
           </button>
         )}
       </div>

@@ -1,0 +1,47 @@
+[
+  {
+    "file": "tortuguero.webp",
+    "source": "https://www.visitcostarica.com/where-to-go/protected-areas/tortuguero-national-park",
+    "image": "https://www.visitcostarica.com/sites/default/files/2024-10/kayak%20mujer%20Tortuguero_64.jpg",
+    "credit": "Visit Costa Rica / ICT",
+    "original_dimensions": [
+      6000,
+      3376
+    ],
+    "changes": "Resized to 1920 px wide, encoded as WebP; responsive display crop and contrast overlay."
+  },
+  {
+    "file": "monteverde.webp",
+    "source": "https://www.fortunaexpeditions.com/destinations/monteverde-cloud-forest",
+    "credit": "Fortuna Expeditions",
+    "original_dimensions": [
+      2560,
+      1707
+    ],
+    "changes": "Resized to 1920 px wide, encoded as WebP; responsive display crop and contrast overlay."
+  },
+  {
+    "file": "manuel-antonio.webp",
+    "source": "https://commons.wikimedia.org/wiki/File:Manuel_Antonio_Beach.jpg",
+    "credit": "Keagiles",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "original_dimensions": [
+      3648,
+      2736
+    ],
+    "changes": "Resized to 1920 px wide, encoded as WebP; responsive display crop and contrast overlay."
+  },
+  {
+    "file": "caribe.webp",
+    "source": "https://commons.wikimedia.org/wiki/File:Cahuita_beach_20.jpg",
+    "credit": "MongeNajera",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "original_dimensions": [
+      3264,
+      2448
+    ],
+    "changes": "Resized to 1920 px wide, encoded as WebP; responsive display crop and contrast overlay."
+  }
+]

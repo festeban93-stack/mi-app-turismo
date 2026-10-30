@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from '@/lib/i18n';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
 import { useState, useEffect } from 'react';
@@ -11,6 +12,7 @@ interface ItineraryModalProps {
 }
 
 export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHighlightRoute }: ItineraryModalProps) {
+  const { t, language } = useLanguage();
   const [region, setRegion] = useState(selectedRegion && selectedRegion !== 'Todas' ? selectedRegion : 'San José');
   const [days, setDays] = useState('2');
   const [budget, setBudget] = useState('150');
@@ -36,7 +38,7 @@ export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHigh
       const res = await authenticatedFetch('/api/itinerary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify({ language,
           region,
           days: parseInt(days, 10),
           budget: parseFloat(budget),
@@ -50,7 +52,7 @@ export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHigh
         setItineraryResult(data.itinerary);
       }
     } catch (err) {
-      alert('Error al calcular la ruta. Intenta de nuevo.');
+      alert(t("Error al calcular la ruta. Intenta de nuevo."));
     } finally {
       setLoading(false);
     }
@@ -61,15 +63,14 @@ export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHigh
       <div className="bg-slate-900 border border-emerald-500/40 w-full max-w-xl rounded-2xl p-5 shadow-2xl flex flex-col gap-4 text-white font-sans max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center border-b border-slate-800 pb-3">
           <h2 className="font-bold text-lg text-emerald-400 flex items-center gap-2">
-            🗺️ Planificador de Rutas IA
-          </h2>
+            {t(" 🗺️ Planificador de Rutas IA ")}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white font-bold text-lg">✕</button>
         </div>
 
         {!itineraryResult ? (
           <form onSubmit={handleGenerate} className="flex flex-col gap-4 text-xs">
             <div>
-              <label className="font-semibold text-slate-300 block mb-1">Selecciona la Región a Explorar</label>
+              <label className="font-semibold text-slate-300 block mb-1">{t("Selecciona la Región a Explorar")}</label>
               <select
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
@@ -83,21 +84,21 @@ export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHigh
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-semibold text-slate-300 block mb-1">Días de Estancia</label>
+                <label className="font-semibold text-slate-300 block mb-1">{t("Días de Estancia")}</label>
                 <select
                   value={days}
                   onChange={(e) => setDays(e.target.value)}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 outline-none focus:border-emerald-500 text-white"
                 >
-                  <option value="1">1 Día (Express)</option>
-                  <option value="2">2 Días (Fin de semana)</option>
-                  <option value="3">3 Días (Recomendado)</option>
-                  <option value="5">5 Días (Inmersivo)</option>
+                  <option value="1">{t("1 Día (Express)")}</option>
+                  <option value="2">{t("2 Días (Fin de semana)")}</option>
+                  <option value="3">{t("3 Días (Recomendado)")}</option>
+                  <option value="5">{t("5 Días (Inmersivo)")}</option>
                 </select>
               </div>
 
               <div>
-                <label className="font-semibold text-slate-300 block mb-1">Presupuesto Máximo ($ USD)</label>
+                <label className="font-semibold text-slate-300 block mb-1">{t("Presupuesto Máximo ($ USD)")}</label>
                 <input
                   type="number"
                   min="20"
@@ -109,16 +110,16 @@ export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHigh
             </div>
 
             <div>
-              <label className="font-semibold text-slate-300 block mb-1">Estilo de Viaje</label>
+              <label className="font-semibold text-slate-300 block mb-1">{t("Estilo de Viaje")}</label>
               <select
                 value={travelStyle}
                 onChange={(e) => setTravelStyle(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 outline-none focus:border-emerald-500 text-white"
               >
-                <option value="Aventura & Naturaleza">Aventura & Naturaleza</option>
-                <option value="Relajación & Gastronomía">Relajación & Gastronomía</option>
-                <option value="Económico & Mochilero">Económico & Mochilero</option>
-                <option value="Familiar">Familiar & Accesible</option>
+                <option value="Aventura & Naturaleza">{t("Aventura & Naturaleza")}</option>
+                <option value="Relajación & Gastronomía">{t("Relajación & Gastronomía")}</option>
+                <option value="Económico & Mochilero">{t("Económico & Mochilero")}</option>
+                <option value="Familiar">{t("Familiar & Accesible")}</option>
               </select>
             </div>
 
@@ -128,8 +129,7 @@ export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHigh
                 onClick={onClose}
                 className="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg font-semibold text-slate-300"
               >
-                Cancelar
-              </button>
+                {t(" Cancelar ")}</button>
               <button
                 type="submit"
                 disabled={loading}
@@ -138,11 +138,11 @@ export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHigh
                 {loading ? (
                   <>
                     <span className="animate-spin">🌀</span>
-                    <span>Optimizando ruta...</span>
+                    <span>{t("Optimizando ruta...")}</span>
                   </>
                 ) : (
                   <>
-                    <span>✨ Generar Itinerario</span>
+                    <span>{t("✨ Generar Itinerario")}</span>
                   </>
                 )}
               </button>
@@ -152,24 +152,23 @@ export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHigh
           <div className="flex flex-col gap-4 text-xs">
             <div className="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-800">
               <div>
-                <h3 className="font-bold text-emerald-400 text-sm">Itinerario en {region} ({days} Días)</h3>
-                <p className="text-[11px] text-slate-400">Presupuesto Est.: ${budget} USD | {travelStyle}</p>
+                <h3 className="font-bold text-emerald-400 text-sm">{t("Itinerario en ")}{region} ({days} {t(" Días)")}</h3>
+                <p className="text-[11px] text-slate-400">{t("Presupuesto Est.: $")}{budget} USD | {travelStyle}</p>
               </div>
               <button
                 onClick={() => setItineraryResult(null)}
                 className="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700"
               >
-                ✏️ Cambiar
-              </button>
+                {t(" ✏️ Cambiar ")}</button>
             </div>
 
             <div className="flex flex-col gap-3 max-h-[50vh] overflow-y-auto pr-1">
               {itineraryResult.map((dayItem: any) => (
                 <div key={dayItem.day} className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3.5 flex flex-col gap-2">
                   <div className="flex justify-between items-center border-b border-slate-700/60 pb-1.5">
-                    <span className="font-bold text-emerald-300 text-xs">DÍA {dayItem.day}: {dayItem.theme}</span>
+                    <span className="font-bold text-emerald-300 text-xs">{t("DÍA ")}{dayItem.day}: {dayItem.theme}</span>
                     <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                      Est. ${dayItem.estimated_daily_cost_usd} USD
+                      {t(" Est. $")}{dayItem.estimated_daily_cost_usd} USD
                     </span>
                   </div>
 
@@ -195,8 +194,7 @@ export default function ItineraryModal({ isOpen, onClose, selectedRegion, onHigh
                 onClick={() => window.print()}
                 className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-1"
               >
-                <span>🖨️</span> Imprimir / Exportar PDF
-              </button>
+                <span>🖨️</span> {t(" Imprimir / Exportar PDF ")}</button>
             </div>
           </div>
         )}

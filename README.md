@@ -120,3 +120,19 @@ Desde la ficha de un destino del catálogo o una tarjeta del viaje, «Agregar a 
 un viaje propio, día y costo en su moneda. Se conserva el viaje de origen: esta acción copia/agrega,
 no traslada ni borra la parada original. El guardado usa el RPC transaccional existente con control de versión.
 No requiere otra migración SQL. Para nuevas paradas personalizadas sin coordenadas, confirmar ubicación en el viaje de destino.
+
+### Pi: portada e idiomas
+
+La ruta `/` presenta Pi con cuatro fotografías reales de Costa Rica. El carrusel cambia cada 5 segundos,
+permite avanzar, retroceder o pausar, respeta movimiento reducido y se pausa con el acceso a la cuenta abierto.
+Las fotografías WebP locales tienen 1920 px de ancho; las fuentes originales tienen entre 2560 y 6000 px.
+Créditos, fuentes y transformaciones: `public/photos/credits.json`. Los dos archivos de Wikimedia se distribuyen
+bajo CC BY-SA 3.0 y conservan sus atribuciones visibles y enlaces a las páginas de licencia.
+
+El mapa y las funciones anteriores están en `/explore`. La portada conserva acceso al inicio de sesión
+Supabase existente, y ofrece acceso al mapa y a los viajes. No agrega otro proveedor de autenticación.
+El selector ES/EN usa `LanguageProvider`; la preferencia se conserva localmente y cambia `html.lang`.
+El diccionario local cubre la interfaz pública de exploración, acceso a la cuenta, perfiles y viajes.
+Los nombres de destinos, notas de usuarios y contenido obtenido de proveedores mantienen su idioma original;
+no se envían automáticamente a un traductor externo. Los valores internos de categorías permanecen en español
+para mantener compatibilidad con filtros y datos existentes. No requiere migración SQL ni variables nuevas.

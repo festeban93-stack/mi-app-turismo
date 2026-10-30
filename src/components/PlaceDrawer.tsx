@@ -1,4 +1,5 @@
 "use client";
+import {useLanguage} from '@/lib/i18n';
 
 import { useEffect } from "react";
 import { CATEGORY_META, type Place } from "@/data/places";
@@ -17,6 +18,7 @@ const kindLabels: Record<Place["kind"], string> = {
 };
 
 export default function PlaceDrawer({ place, onClose }: PlaceDrawerProps) {
+  const { t } = useLanguage();
   useEffect(() => {
     if (!place) return;
 
@@ -49,7 +51,7 @@ export default function PlaceDrawer({ place, onClose }: PlaceDrawerProps) {
         }`}
         onClick={onClose}
         tabIndex={open ? 0 : -1}
-        aria-label="Cerrar ficha del lugar"
+        aria-label={t("Cerrar ficha del lugar")}
       />
 
       <aside
@@ -78,8 +80,7 @@ export default function PlaceDrawer({ place, onClose }: PlaceDrawerProps) {
                   onClick={onClose}
                   className="rounded-full bg-white/15 px-3 py-1 text-sm hover:bg-white/25"
                 >
-                  Cerrar
-                </button>
+                  {t(" Cerrar ")}</button>
               </div>
               <p className="text-xs font-medium tracking-[0.18em] text-white/70 uppercase">
                 {kindLabels[place.kind]}
@@ -105,8 +106,7 @@ export default function PlaceDrawer({ place, onClose }: PlaceDrawerProps) {
 
               <section>
                 <h3 className="text-xs font-semibold tracking-[0.16em] text-zinc-400 uppercase">
-                  Dirección
-                </h3>
+                  {t(" Dirección ")}</h3>
                 <p className="mt-1 text-sm text-zinc-800 dark:text-zinc-200">
                   {place.address}
                 </p>
@@ -118,8 +118,7 @@ export default function PlaceDrawer({ place, onClose }: PlaceDrawerProps) {
               {place.typicalDishes && place.typicalDishes.length > 0 ? (
                 <section>
                   <h3 className="text-xs font-semibold tracking-[0.16em] text-zinc-400 uppercase">
-                    Platos típicos y sabores
-                  </h3>
+                    {t(" Platos típicos y sabores ")}</h3>
                   <ul className="mt-2 flex flex-wrap gap-2">
                     {place.typicalDishes.map((dish) => (
                       <li
@@ -135,8 +134,7 @@ export default function PlaceDrawer({ place, onClose }: PlaceDrawerProps) {
 
               <section>
                 <h3 className="text-xs font-semibold tracking-[0.16em] text-zinc-400 uppercase">
-                  Tips locales
-                </h3>
+                  {t(" Tips locales ")}</h3>
                 <ul className="mt-2 space-y-2">
                   {place.localTips.map((tip) => (
                     <li
@@ -172,8 +170,7 @@ export default function PlaceDrawer({ place, onClose }: PlaceDrawerProps) {
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center rounded-full bg-teal-800 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
                 >
-                  Sitio oficial
-                </a>
+                  {t(" Sitio oficial ")}</a>
               ) : null}
             </div>
           </>

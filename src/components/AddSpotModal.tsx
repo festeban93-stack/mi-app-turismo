@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from '@/lib/i18n';
 
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
 
@@ -39,6 +40,7 @@ interface AddSpotModalProps {
 }
 
 export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotModalProps) {
+  const { t } = useLanguage();
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('naturaleza');
   const [description, setDescription] = useState('');
@@ -250,8 +252,8 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
               <Compass className="w-5 h-5 animate-spin-slow" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white leading-tight">Reportar Gema Oculta</h3>
-              <p className="text-[11px] text-slate-400">Verificación con evidencia fotográfica</p>
+              <h3 className="text-base font-bold text-white leading-tight">{t("Reportar Gema Oculta")}</h3>
+              <p className="text-[11px] text-slate-400">{t("Verificación con evidencia fotográfica")}</p>
             </div>
           </div>
           <button
@@ -273,16 +275,15 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
               </div>
 
               <div className="space-y-1">
-                <h4 className="text-xl font-black text-white">¡Gema Enviada a Verificación!</h4>
+                <h4 className="text-xl font-black text-white">{t("¡Gema Enviada a Verificación!")}</h4>
                 <p className="text-xs text-slate-300">
-                  Gracias <span className="font-bold text-cyan-400">{nickname || 'por tu aporte'}</span>. Tu foto e información están en revisión.
-                </p>
+                  {t(" Gracias ")}<span className="font-bold text-cyan-400">{nickname || t("por tu aporte")}</span>{t(". Tu foto e información están en revisión. ")}</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/80 space-y-2 max-w-xs mx-auto shadow-inner">
                 <div className="flex items-center justify-center gap-2 text-emerald-400 text-xs font-extrabold">
                   <Award className="w-4 h-4" />
-                  <span>Tu aporte será revisado antes de publicarse</span>
+                  <span>{t("Tu aporte será revisado antes de publicarse")}</span>
                 </div>
               </div>
 
@@ -290,8 +291,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                 onClick={onClose}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold text-xs shadow-lg hover:brightness-110 transition-all"
               >
-                Volver al Mapa Interactivo
-              </button>
+                {t(" Volver al Mapa Interactivo ")}</button>
             </div>
           ) : (
             /* Formulario */
@@ -299,7 +299,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
               
               {/* MODALIDAD DE UBICACIÓN (GPS VS MANUAL/MAPA) */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-300">Ubicación del Lugar *</label>
+                <label className="text-xs font-semibold text-slate-300">{t("Ubicación del Lugar *")}</label>
                 
                 {/* Selector de Pestañas */}
                 <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
@@ -313,7 +313,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                     }`}
                   >
                     <Navigation className="w-3.5 h-3.5" />
-                    <span>GPS Automático</span>
+                    <span>{t("GPS Automático")}</span>
                   </button>
 
                   <button
@@ -326,7 +326,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                     }`}
                   >
                     <Map className="w-3.5 h-3.5" />
-                    <span>Elegir en Mapa</span>
+                    <span>{t("Elegir en Mapa")}</span>
                   </button>
                 </div>
 
@@ -336,18 +336,17 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                     <div className="flex items-center gap-2.5 text-xs">
                       <MapPin className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                       <div>
-                        <span className="font-semibold text-slate-200">Coordenadas GPS:</span>
+                        <span className="font-semibold text-slate-200">{t("Coordenadas GPS:")}</span>
                         <p className="text-[10px] text-slate-400">
                           {isGettingLocation ? (
                             <span className="inline-flex items-center gap-1 text-cyan-400">
-                              <Loader2 className="w-3 h-3 animate-spin" /> Capturando GPS...
-                            </span>
+                              <Loader2 className="w-3 h-3 animate-spin" /> {t(" Capturando GPS... ")}</span>
                           ) : latitude && longitude ? (
                             <span className="text-emerald-400 font-mono">
                               {latitude.toFixed(4)}, {longitude.toFixed(4)}
                             </span>
                           ) : (
-                            <span className="text-amber-400">Sin GPS</span>
+                            <span className="text-amber-400">{t("Sin GPS")}</span>
                           )}
                         </p>
                       </div>
@@ -370,11 +369,11 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                     <div className="space-y-1">
                       <label className="text-[11px] text-slate-400 flex items-center gap-1">
                         <Link2 className="w-3 h-3 text-cyan-400" />
-                        <span>Pegá link de Google Maps o coordenadas &quot;lat, lng&quot;:</span>
+                        <span>{t("Pegá link de Google Maps o coordenadas &quot;lat, lng&quot;:")}</span>
                       </label>
                       <input
                         type="text"
-                        placeholder="Ej: https://maps.app.goo.gl/... o 9.9321, -84.0812"
+                        placeholder={t("Ej: https://maps.app.goo.gl/... o 9.9321, -84.0812")}
                         value={rawLocationInput}
                         onChange={(e) => handleParseLocationInput(e.target.value)}
                         className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500"
@@ -394,7 +393,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                     {/* Indicadores Numéricos */}
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
-                        <span className="text-[10px] text-slate-400">Latitud:</span>
+                        <span className="text-[10px] text-slate-400">{t("Latitud:")}</span>
                         <input
                           type="number"
                           step="0.0001"
@@ -404,7 +403,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                         />
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-400">Longitud:</span>
+                        <span className="text-[10px] text-slate-400">{t("Longitud:")}</span>
                         <input
                           type="number"
                           step="0.0001"
@@ -421,21 +420,21 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
               {/* FOTOGRAFÍA: CÁMARA O GALERÍA */}
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                  <span>Foto del Lugar (Evidencia) *</span>
-                  {imageUrl && <span className="text-[10px] text-emerald-400 font-bold">✓ Subida con éxito</span>}
+                  <span>{t("Foto del Lugar (Evidencia) *")}</span>
+                  {imageUrl && <span className="text-[10px] text-emerald-400 font-bold">{t("✓ Subida con éxito")}</span>}
                 </label>
 
                 {imagePreview ? (
                   <div className="relative w-full h-36 rounded-2xl overflow-hidden border border-slate-700 bg-slate-950">
                     <img
                       src={imagePreview}
-                      alt="Vista previa"
+                      alt={t("Vista previa")}
                       className="w-full h-full object-cover"
                     />
                     {isUploadingImage && (
                       <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center text-xs text-cyan-400 font-bold gap-2">
                         <Loader2 className="w-6 h-6 animate-spin" />
-                        <span>Subiendo a la nube...</span>
+                        <span>{t("Subiendo a la nube...")}</span>
                       </div>
                     )}
                     {!isUploadingImage && (
@@ -459,7 +458,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                       className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 hover:bg-slate-800/60 hover:border-cyan-500/50 text-slate-300 hover:text-white transition-all group"
                     >
                       <Camera className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
-                      <span className="text-xs font-semibold">Tomar Foto (Cámara)</span>
+                      <span className="text-xs font-semibold">{t("Tomar Foto (Cámara)")}</span>
                     </button>
 
                     <button
@@ -468,7 +467,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                       className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 hover:bg-slate-800/60 hover:border-emerald-500/50 text-slate-300 hover:text-white transition-all group"
                     >
                       <ImageIcon className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
-                      <span className="text-xs font-semibold">Elegir de Galería</span>
+                      <span className="text-xs font-semibold">{t("Elegir de Galería")}</span>
                     </button>
                   </div>
                 )}
@@ -476,11 +475,11 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
 
               {/* Nombre de la Gema */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Nombre de la Gema Oculta *</label>
+                <label className="text-xs font-semibold text-slate-300">{t("Nombre de la Gema Oculta *")}</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej: Mirador Valle del Sol, Soda Doña Rosa..."
+                  placeholder={t("Ej: Mirador Valle del Sol, Soda Doña Rosa...")}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500 focus:outline-none text-xs text-white"
@@ -489,7 +488,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
 
               {/* Categorías */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">Categoría</label>
+                <label className="text-xs font-semibold text-slate-300">{t("Categoría")}</label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { id: 'gastronomia', label: 'Gastronomía', icon: Utensils },
@@ -520,20 +519,20 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
               {/* Cantón y Apodo */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">Cantón / Zona</label>
+                  <label className="text-xs font-semibold text-slate-300">{t("Cantón / Zona")}</label>
                   <input
                     type="text"
-                    placeholder="Ej: Bajos de Toro, Sarchí"
+                    placeholder={t("Ej: Bajos de Toro, Sarchí")}
                     value={addressText}
                     onChange={(e) => setAddressText(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">Tu Apodo de Explorador</label>
+                  <label className="text-xs font-semibold text-slate-300">{t("Tu Apodo de Explorador")}</label>
                   <input
                     type="text"
-                    placeholder="Ej: Esteban R."
+                    placeholder={t("Ej: Esteban R.")}
                     value={nickname}
                     onChange={(e) => setNickname(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white"
@@ -545,8 +544,7 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
               <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-950/50 to-cyan-950/50 border border-emerald-500/30 flex items-center gap-2.5">
                 <Sparkles className="w-5 h-5 text-emerald-400 flex-shrink-0 animate-bounce" />
                 <p className="text-[11px] text-slate-300 leading-snug">
-                  Ganarás <strong className="text-emerald-400">+50 Pts</strong> y la insignia <strong className="text-cyan-400">Pionero Local</strong> tras ser verificada.
-                </p>
+                  {t(" Ganarás ")}<strong className="text-emerald-400">+50 Pts</strong> {t(" y la insignia ")}<strong className="text-cyan-400">{t("Pionero Local")}</strong> {t(" tras ser verificada. ")}</p>
               </div>
 
               {/* Botón de Envío */}
@@ -558,10 +556,10 @@ export default function AddSpotModal({ isOpen, onClose, onSpotAdded }: AddSpotMo
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Enviando a moderación...</span>
+                    <span>{t("Enviando a moderación...")}</span>
                   </>
                 ) : (
-                  <span>🔒 Enviar a Verificación (+50 Pts)</span>
+                  <span>{t("🔒 Enviar a Verificación (+50 Pts)")}</span>
                 )}
               </button>
             </form>

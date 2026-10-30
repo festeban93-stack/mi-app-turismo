@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from '@/lib/i18n';
 
 import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
@@ -101,6 +102,7 @@ function MapController({ routeSpots, selectedSpot }: { routeSpots?: any[]; selec
 }
 
 export default function MapClient({ spots, selectedSpot, onSelectSpot, routeSpots = [] }: MapClientProps) {
+  const { t } = useLanguage();
   const defaultCenter: [number, number] = [9.7489, -83.7534];
 
   const routePolylineCoords = routeSpots
@@ -168,7 +170,7 @@ export default function MapClient({ spots, selectedSpot, onSelectSpot, routeSpot
                 <p className="text-slate-500 text-[10px]">{spot.address_text || 'Costa Rica'}</p>
                 {isPartOfRoute && (
                   <span className="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold border border-emerald-300">
-                    {routeIndex === 0 ? '🏁 Inicio de la Ruta' : routeIndex === routeSpots.length - 1 ? '🎯 Destino Final' : `Parada #${routeIndex + 1}`}
+                    {routeIndex === 0 ? t("🏁 Inicio de la Ruta") : routeIndex === routeSpots.length - 1 ? t("🎯 Destino Final") : t(`Parada #${routeIndex + 1}`)}
                   </span>
                 )}
               </div>
@@ -178,7 +180,7 @@ export default function MapClient({ spots, selectedSpot, onSelectSpot, routeSpot
       })}
       {routeSpots.filter(s => Number.isFinite(Number(s.latitude)) && Number.isFinite(Number(s.longitude))).map((spot,index) => (
         <Marker key={`route-${index}`} position={[Number(spot.latitude),Number(spot.longitude)]} icon={createNumberedRouteIcon((spot.routeNumber || index+1)-1, routeSpots.length)}>
-          <Popup><strong>Parada {spot.routeNumber || index+1}: {spot.title}</strong><p>{spot.address_text || ''}</p></Popup>
+          <Popup><strong>{t("Parada ")}{spot.routeNumber || index+1}: {spot.title}</strong><p>{spot.address_text || ''}</p></Popup>
         </Marker>
       ))}
     </MapContainer>

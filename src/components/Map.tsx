@@ -1,4 +1,5 @@
 "use client";
+import {useLanguage} from '@/lib/i18n';
 
 import { useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
@@ -34,6 +35,7 @@ const getCoordinates = (place: any): [number, number] | null => {
 };
 
 export default function Map() {
+  const { t } = useLanguage();
   const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
   const [checkedIn, setCheckedIn] = useState(false);
 
@@ -98,14 +100,13 @@ export default function Map() {
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 my-4">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-lg">🎧</span>
-                  <h4 className="font-bold text-amber-900 text-sm">Guía Turístico IA</h4>
+                  <h4 className="font-bold text-amber-900 text-sm">{t("Guía Turístico IA")}</h4>
                 </div>
                 <p className="text-xs text-amber-800 leading-relaxed mb-3">
                   {selectedPlace.history || selectedPlace.details || "¡Bienvenido a este increíble lugar! Aquí verás la narración histórica, secretos del sitio y la historia de sus platillos estrella."}
                 </p>
                 <button className="w-full bg-amber-600 hover:bg-amber-700 text-white text-xs py-2 rounded-lg font-medium transition-all">
-                  ▶ Escuchar Audioguía
-                </button>
+                  {t(" ▶ Escuchar Audioguía ")}</button>
               </div>
             )}
           </div>
@@ -116,12 +117,10 @@ export default function Map() {
                 onClick={() => setCheckedIn(true)}
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2"
               >
-                <span>📍</span> Hacer Check-in aquí
-              </button>
+                <span>📍</span> {t(" Hacer Check-in aquí ")}</button>
             ) : (
               <p className="text-center text-xs font-medium text-emerald-600">
-                ✓ ¡Check-in confirmado! Disfruta de la guía.
-              </p>
+                {t(" ✓ ¡Check-in confirmado! Disfruta de la guía. ")}</p>
             )}
           </div>
         </div>

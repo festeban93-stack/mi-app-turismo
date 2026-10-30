@@ -1,4 +1,5 @@
 'use client';
+import { useLanguage } from '@/lib/i18n';
 
 import React, { useState, useEffect } from 'react';
 import { saveTrip } from '@/lib/save-trip';
@@ -46,6 +47,7 @@ export default function CustomTripModal({
   onRequireAuth,
   onOpenAddSpotWithTitle
 }: CustomTripModalProps) {
+  const { t } = useLanguage();
   const [tripTitle, setTripTitle] = useState('');
   const [durationDays, setDurationDays] = useState(2);
 
@@ -143,16 +145,16 @@ export default function CustomTripModal({
 
   const handleSaveTrip = async () => {
     if (!tripTitle.trim()) {
-      alert('Por favor ingresá un nombre para tu viaje.');
+      alert(t("Por favor ingresá un nombre para tu viaje."));
       return;
     }
     if (selectedSpots.length === 0) {
-      alert('Agregá al menos un lugar o parada personalizada.');
+      alert(t("Agregá al menos un lugar o parada personalizada."));
       return;
     }
 
     if (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 30 || selectedSpots.some(item => item.day < 1 || item.day > durationDays)) {
-      alert('Revisá la duración: todas las paradas deben estar dentro de los días elegidos.');
+      alert(t("Revisá la duración: todas las paradas deben estar dentro de los días elegidos."));
       return;
     }
     if (loading) return;
@@ -206,9 +208,8 @@ export default function CustomTripModal({
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                Crear Viaje Personalizado
-              </h3>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">Presupuesto en tiempo real y colaboración</p>
+                {t(" Crear Viaje Personalizado ")}</h3>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">{t("Presupuesto en tiempo real y colaboración")}</p>
             </div>
           </div>
 
@@ -225,18 +226,15 @@ export default function CustomTripModal({
             <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto animate-bounce" />
             <div className="space-y-1">
               <h4 className="text-base font-extrabold text-slate-900 dark:text-white">
-                ¡Viaje &quot;{tripTitle}&quot; Creado!
-              </h4>
+                {t(" ¡Viaje &quot;")}{tripTitle}{t("&quot; Creado! ")}</h4>
               <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xs mx-auto leading-relaxed">
-                Costo Total Estimado: <strong className="text-emerald-600 dark:text-emerald-400">${totalTripCost.toLocaleString()}</strong>. La ruta ha sido cargada en tu mapa interactivo.
-              </p>
+                {t(" Costo Total Estimado: ")}<strong className="text-emerald-600 dark:text-emerald-400">${totalTripCost.toLocaleString()}</strong>{t(". La ruta ha sido cargada en tu mapa interactivo. ")}</p>
             </div>
             <button
               onClick={handleResetAndClose}
               className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all"
             >
-              Ver Itinerario en la Plataforma
-            </button>
+              {t(" Ver Itinerario en la Plataforma ")}</button>
           </div>
         ) : (
           <div className="space-y-4 overflow-y-auto custom-scrollbar p-1 flex-1">
@@ -244,10 +242,10 @@ export default function CustomTripModal({
             {/* 1. Nombre y Duración */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
               <div className="sm:col-span-2 space-y-1">
-                <label className="font-bold text-slate-700 dark:text-slate-300">Nombre del Viaje</label>
+                <label className="font-bold text-slate-700 dark:text-slate-300">{t("Nombre del Viaje")}</label>
                 <input
                   type="text"
-                  placeholder="Ej: Paseo a La Fortuna con Amigos"
+                  placeholder={t("Ej: Paseo a La Fortuna con Amigos")}
                   value={tripTitle}
                   onChange={e => setTripTitle(e.target.value)}
                   className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
@@ -257,7 +255,7 @@ export default function CustomTripModal({
               <div className="space-y-1">
                 <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Duración (Días)</span>
+                  <span>{t("Duración (Días)")}</span>
                 </label>
                 <input
                   type="number"
@@ -274,7 +272,7 @@ export default function CustomTripModal({
             <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 space-y-2">
               <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Invitar Amigos por Correo</span>
+                <span>{t("Invitar Amigos por Correo")}</span>
               </label>
               <div className="flex items-center gap-1.5">
                 <input
@@ -289,8 +287,7 @@ export default function CustomTripModal({
                   onClick={handleAddCollaborator}
                   className="px-3 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-950 font-bold text-xs hover:bg-slate-800 transition-all"
                 >
-                  Invitar
-                </button>
+                  {t(" Invitar ")}</button>
               </div>
 
               {invitedEmails.length > 0 && (
@@ -312,13 +309,13 @@ export default function CustomTripModal({
             <div className="p-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 space-y-2">
               <label className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Agregar Parada Libre + Costo Estimado</span>
+                <span>{t("Agregar Parada Libre + Costo Estimado")}</span>
               </label>
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                 <input
                   type="text"
-                  placeholder="Nombre de la parada..."
+                  placeholder={t("Nombre de la parada...")}
                   value={customPlaceName}
                   onChange={e => setCustomPlaceName(e.target.value)}
                   className="sm:col-span-2 p-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
@@ -327,7 +324,7 @@ export default function CustomTripModal({
                   <DollarSign className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
                   <input
                     type="number"
-                    placeholder="Costo ($)"
+                    placeholder={t("Costo ($)")}
                     value={customPlaceCost}
                     onChange={e => setCustomPlaceCost(e.target.value)}
                     className="w-full pl-7 pr-2 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
@@ -343,7 +340,7 @@ export default function CustomTripModal({
                     onClick={() => handleAddCustomPlace(idx + 1)}
                     className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition-all"
                   >
-                    + Día {idx + 1}
+                    {t(" + Día ")}{idx + 1}
                   </button>
                 ))}
               </div>
@@ -353,14 +350,14 @@ export default function CustomTripModal({
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                 <Search className="w-3.5 h-3.5 text-emerald-600" />
-                <span>O seleccionar gemas del mapa (Con precios precargados)</span>
+                <span>{t("O seleccionar gemas del mapa (Con precios precargados)")}</span>
               </label>
 
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Buscar gemas..."
+                  placeholder={t("Buscar gemas...")}
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs focus:border-emerald-500 focus:outline-none"
@@ -369,7 +366,7 @@ export default function CustomTripModal({
 
               <div className="max-h-32 overflow-y-auto custom-scrollbar space-y-1 border border-slate-200 dark:border-slate-800/80 rounded-xl p-2 bg-slate-50/50 dark:bg-slate-900/30">
                 {filteredSpots.length === 0 ? (
-                  <p className="text-[10px] text-slate-400 text-center py-2">No hay coincidencias.</p>
+                  <p className="text-[10px] text-slate-400 text-center py-2">{t("No hay coincidencias.")}</p>
                 ) : (
                   filteredSpots.slice(0, 6).map(spot => {
                     const isAdded = selectedSpots.some(item => item.spot?.id === spot.id);
@@ -381,12 +378,12 @@ export default function CustomTripModal({
                         <div className="truncate pr-2">
                           <p className="font-bold text-slate-900 dark:text-white truncate">{spot.title}</p>
                           <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">
-                            {spot.entry_fee || 'Entrada Libre'}
+                            {spot.entry_fee || t("Entrada Libre")}
                           </p>
                         </div>
 
                         {isAdded ? (
-                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Agregado ✓</span>
+                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{t("Agregado ✓")}</span>
                         ) : (
                           <div className="flex items-center gap-1">
                             {Array.from({ length: durationDays }).map((_, idx) => (
@@ -395,7 +392,7 @@ export default function CustomTripModal({
                                 onClick={() => handleAddSpotToTrip(spot, idx + 1)}
                                 className="px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 hover:bg-emerald-600 hover:text-white text-emerald-800 dark:text-emerald-300 font-bold text-[9px] transition-all"
                               >
-                                + Día {idx + 1}
+                                {t(" + Día ")}{idx + 1}
                               </button>
                             ))}
                           </div>
@@ -412,10 +409,9 @@ export default function CustomTripModal({
               <div className="space-y-2 pt-2 border-t border-slate-200/80 dark:border-slate-800/80">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    Itinerario ({selectedSpots.length} paradas)
-                  </label>
+                    {t(" Itinerario (")}{selectedSpots.length} {t(" paradas) ")}</label>
                   <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
-                    Total: ${totalTripCost.toLocaleString()} USD/CRC
+                    {t(" Total: $")}{totalTripCost.toLocaleString()} USD/CRC
                   </span>
                 </div>
 
@@ -427,7 +423,7 @@ export default function CustomTripModal({
                     >
                       <div className="flex items-center gap-2 truncate pr-2">
                         <span className="px-1.5 py-0.5 rounded-md bg-emerald-600 text-white font-extrabold text-[9px]">
-                          Día {item.day}
+                          {t(" Día ")}{item.day}
                         </span>
                         <div className="truncate">
                           <p className="font-bold text-slate-900 dark:text-white truncate">
@@ -444,7 +440,7 @@ export default function CustomTripModal({
                               className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold hover:underline flex items-center gap-1"
                             >
                               <Gem className="w-2.5 h-2.5" />
-                              <span>¿Es una Gema Oculta? Aportala (+50 Pts)</span>
+                              <span>{t("¿Es una Gema Oculta? Aportala (+50 Pts)")}</span>
                             </button>
                           )}
                         </div>
@@ -484,7 +480,7 @@ export default function CustomTripModal({
               ) : (
                 <Sparkles className="w-4 h-4" />
               )}
-              <span>{loading ? 'Guardando Viaje...' : `Guardar Viaje ($${totalTripCost.toLocaleString()} Est.)`}</span>
+              <span>{loading ? t("Guardando Viaje...") : t(`Guardar Viaje ($${totalTripCost.toLocaleString()} Est.)`)}</span>
             </button>
 
           </div>
