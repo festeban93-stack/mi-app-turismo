@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 
 interface MyTripsDrawerProps {
+  onTravelLayoutChange?: (layout: 'none' | 'split' | 'map') => void;
   availableSpots?: any[];
   isOpen: boolean;
   onClose: () => void;
@@ -29,10 +30,12 @@ interface MyTripsDrawerProps {
 export default function MyTripsDrawer({
   isOpen,
   availableSpots = [],
+  onTravelLayoutChange,
   onClose,
   currentUser,
   onApplyTripToMap
 }: MyTripsDrawerProps) {
+  const [mapOnly,setMapOnly] = useState(false);
   const [travelStops, setTravelStops] = useState<any[] | null>(null);
   const detailRequest = useRef(0);
   const [trips, setTrips] = useState<any[]>([]);
@@ -46,6 +49,8 @@ export default function MyTripsDrawer({
 
   const [previousUser, setPreviousUser] = useState(currentUser?.id);
   if (previousUser !== currentUser?.id) { setPreviousUser(currentUser?.id); setSelectedTrip(null); setTripSpots([]); setTrips([]); setTravelStops(null); setEditing(false); }
+
+  useEffect(() => { onTravelLayoutChange?.(isOpen && travelStops ? (mapOnly ? 'map' : 'split') : 'none'); }, [isOpen,travelStops,mapOnly,onTravelLayoutChange]);
 
   const [previousOpen, setPreviousOpen] = useState(isOpen);
   if (previousOpen !== isOpen) { setPreviousOpen(isOpen); if (isOpen) setLoading(true); }
@@ -77,18 +82,17 @@ export default function MyTripsDrawer({
 
   const handleSelectTrip = async (trip: any) => {
     const request = ++detailRequest.current;
-    setTravelStops(null); setEditing(false); setNotice(''); setDetailError(''); setTripSpots([]);
+    setMapOnly(false); setTravelStops(null); setEditing(false); setNotice(''); setDetailError(''); setTripSpots([]);
     setSelectedTrip(trip);
     setLoading(true);
     try {
-      const [details, metadata] = await Promise.all([
-        supabase.from('trip_spots').select('*, spots(*)').eq('trip_id', trip.id)
-          .order('day_number', { ascending: true }).order('order_index', { ascending: true }),
-        supabase.from('trips').select('*').eq('id', trip.id).single(),
-      ]);
+      const metadata = await supabase.from('trips').select('*').eq('id', trip.id).single();
+      if (metadata.error) throw metadata.error;
+      const details = await supabase.from('trip_spots').select('*, spots(*)').eq('trip_id', trip.id)
+        .order('day_number', { ascending: true }).order('order_index', { ascending: true });
       if (request !== detailRequest.current) return;
       const { data, error } = details;
-      if (metadata.error) throw metadata.error;
+
       setSelectedTrip(metadata.data);
 
       if (error) throw error;
@@ -123,10 +127,11 @@ export default function MyTripsDrawer({
   const totalCost = tripSpots.reduce((sum, item) => sum + (parseFloat(item.estimated_cost) || 0), 0);
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 shadow-2xl p-5 flex flex-col justify-between overflow-y-auto animate-fade-in text-slate-900 dark:text-slate-100 select-none">
+    <div className={`fixed right-0 bottom-0 z-50 w-full max-w-md bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 shadow-2xl p-4 md:p-5 flex flex-col justify-between overflow-y-auto animate-fade-in text-slate-900 dark:text-slate-100 select-none ${travelStops ? (mapOnly ? 'h-20 md:h-auto md:top-0' : 'h-[62dvh] md:h-auto md:top-0 rounded-t-3xl md:rounded-none') : 'top-0'}`}>
       
+      {travelStops && <button className="sticky top-0 z-10 mb-3 min-h-11 rounded-xl bg-emerald-600 p-2 text-sm font-bold text-white md:hidden" onClick={()=>setMapOnly(v=>!v)}>{mapOnly?'Ver tarjetas del viaje ↑':'Ver mapa completo ↓'}</button>}
       {/* Header */}
-      <div>
+      <div className={travelStops && mapOnly ? 'hidden md:block' : ''}>
         <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -262,7 +267,7 @@ export default function MyTripsDrawer({
         </div>
       </div>
 
-      <div className="p-3 text-center text-[10px] text-slate-400 border-t border-slate-200 dark:border-slate-800">
+      <div className={`${travelStops && mapOnly ? 'hidden md:block' : ''} p-3 text-center text-[10px] text-slate-400 border-t border-slate-200 dark:border-slate-800`}>
         MapAI Trip Manager • Integración IA + Colaborativo
       </div>
 

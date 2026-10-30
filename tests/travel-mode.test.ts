@@ -1,9 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {restoreProgress,travelSignature,freshProgress,validPoint,navigationLink} from '../src/lib/travel-mode';
+import {restoreProgress,travelSignature,freshProgress,toggleStop,stopKey,validPoint,navigationLink} from '../src/lib/travel-mode';
 const stops=[{custom_title:'Puerto Viejo',day_number:1},{custom_title:'Cahuita',day_number:2},{custom_title:'Sixaola',day_number:2}];
 test('travel resumes same-day stops in order and resets progress after itinerary changes',()=>{
- const saved=JSON.stringify({signature:travelSignature(stops),progress:{...freshProgress(),completed:2,paused:true}});
+ const saved=JSON.stringify({signature:travelSignature(stops),progress:{completed:2,paused:true,finished:false,locations:{}}});
  assert.equal(restoreProgress(saved,stops).completed,2);
  assert.equal(restoreProgress(saved,stops).paused,true);
  assert.equal(restoreProgress(saved,[...stops].reverse()).completed,0);
@@ -20,4 +20,20 @@ test('navigation uses confirmed coordinates and a Google Maps directions link',(
  const url=new URL(navigationLink({latitude:9.65,longitude:-82.75}));
  assert.equal(url.hostname,'www.google.com');
  assert.equal(url.searchParams.get('destination'),'9.65,-82.75');
+});
+
+test('cards can complete and undo any stop, retaining the next pending destination',()=>{
+ let progress=freshProgress();
+ progress=toggleStop(progress,stops,2);
+ assert.equal(progress.completed,1);
+ assert.deepEqual(progress.checked,[stopKey(stops[2],2)]);
+ progress=toggleStop(progress,stops,0);
+ progress=toggleStop(progress,stops,1);
+ assert.equal(progress.finished,true);
+ progress=toggleStop(progress,stops,1);
+ assert.equal(progress.finished,false);
+ assert.equal(progress.completed,2);
+ assert.deepEqual(toggleStop({...progress,paused:true},stops,0),{...progress,paused:true});
+ const saved=JSON.stringify({signature:travelSignature(stops),progress});
+ assert.deepEqual(restoreProgress(saved,stops).checked,progress.checked);
 });

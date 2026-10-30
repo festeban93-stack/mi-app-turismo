@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import AddDestinationToTrip from './AddDestinationToTrip';
 import { 
   X, 
   MapPin, 
@@ -161,6 +162,7 @@ export default function SpotDetailCard({
         </button>
       </div>
 
+      {currentUser ? <AddDestinationToTrip key={currentUser.id+spot.id} userId={currentUser.id} destination={{spot_id:spot.id,custom_title:spot.title,custom_address:spot.address_text}}/> : <button onClick={onRequireAuth} className="min-h-11 w-full rounded-xl border p-2 text-sm font-bold">Ingresá para agregar a un viaje</button>}
       {/* Botones Principales de Acción (Navegación & Audio) */}
       <div className="grid grid-cols-3 gap-1.5">
         <a
