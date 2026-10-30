@@ -67,6 +67,15 @@ interface MapClientProps {
 
 function MapController({ routeSpots, selectedSpot }: { routeSpots?: any[]; selectedSpot?: any }) {
   const map = useMap();
+  useEffect(() => {
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+      const coords = (routeSpots || []).filter(s=>s.latitude!=null && s.longitude!=null).map(s=>[Number(s.latitude),Number(s.longitude)] as [number,number]).filter(p=>Number.isFinite(p[0])&&Number.isFinite(p[1]));
+      if (!selectedSpot && coords.length) map.fitBounds(coords, {padding:[24,24],maxZoom:13});
+    });
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map,routeSpots,selectedSpot]);
 
   useEffect(() => {
     if (selectedSpot?.latitude && selectedSpot?.longitude) {

@@ -57,6 +57,7 @@ export default function HomePage() {
   const [isMyTripsDrawerOpen, setIsMyTripsDrawerOpen] = useState<boolean>(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState<boolean>(false);
   const [copilotInitialPrompt, setCopilotInitialPrompt] = useState<string>('');
+  const [travelLayout,setTravelLayout] = useState<'none' | 'split' | 'map'>('none');
   const [routeSpots, setRouteSpots] = useState<any[]>([]);
 
   // Escuchar sesión activa
@@ -171,7 +172,7 @@ export default function HomePage() {
         {spotsError} <button onClick={() => void fetchSpots()} className="font-bold underline">Reintentar</button>
       </div>}
       {/* 1. MAPA INTERACTIVO */}
-      <div className="absolute inset-0 z-0">
+      <div className={`absolute top-0 left-0 right-0 z-0 ${travelLayout==='split' ? 'bottom-[62dvh] md:bottom-0 md:right-[28rem]' : travelLayout==='map' ? 'bottom-20 md:bottom-0 md:right-[28rem]' : 'bottom-0'}`}>
         <MapWithNoSSR
           spots={filteredSpots}
           selectedSpot={selectedSpot}
@@ -281,7 +282,7 @@ export default function HomePage() {
       </div>
 
       {/* 4. DASHBOARD / PANELS */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 md:absolute md:top-14 md:bottom-auto md:left-auto md:right-3 md:w-80 pointer-events-auto transition-all duration-300">
+      <div hidden={travelLayout!=='none'} className="fixed bottom-0 left-0 right-0 z-30 md:absolute md:top-14 md:bottom-auto md:left-auto md:right-3 md:w-80 pointer-events-auto transition-all duration-300">
         {selectedSpot ? (
           <SpotDetailCard
             spot={selectedSpot}
@@ -332,7 +333,7 @@ export default function HomePage() {
         onClose={() => setIsCustomTripModalOpen(false)}
         currentUser={currentUser}
         availableSpots={spots}
-        onApplyTripToMap={(spotsForRoute) => setRouteSpots(spotsForRoute)}
+        onApplyTripToMap={(spotsForRoute) => { setSelectedSpot(null); setRouteSpots(spotsForRoute); }}
         onRequireAuth={handleOpenAuthForLogin}
         onOpenAddSpotWithTitle={(title) => {
           setPrefilledGemaTitle(title);
@@ -341,11 +342,12 @@ export default function HomePage() {
       />
 
       <MyTripsDrawer
+        onTravelLayoutChange={setTravelLayout}
         availableSpots={spots}
         isOpen={isMyTripsDrawerOpen}
         onClose={() => setIsMyTripsDrawerOpen(false)}
         currentUser={currentUser}
-        onApplyTripToMap={(spotsForRoute) => setRouteSpots(spotsForRoute)}
+        onApplyTripToMap={(spotsForRoute) => { setSelectedSpot(null); setRouteSpots(spotsForRoute); }}
       />
 
       <AICopilotDrawer

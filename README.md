@@ -106,3 +106,17 @@ Cada parada sin ubicación puede ubicarse manualmente en un mapa y confirmarse a
 En esta primera versión, avance y coordenadas ajustadas se guardan en localStorage, separados por usuario y viaje.
 No se sincronizan entre dispositivos ni se guardan en Supabase; cambiar el orden/destinos reinicia el avance.
 No se solicita ubicación del dispositivo ni se hace seguimiento GPS. No requiere otra migración SQL.
+
+### Tarjetas de destino y uso móvil
+
+El modo de viaje muestra tarjetas con la fotografía disponible del catálogo, categoría, notas,
+presupuesto, etiqueta de día y número de destino y acceso a Maps. Si no hay foto, se indica su ausencia.
+El check de cada tarjeta permite completar o desmarcar cualquier parada; la próxima es la primera pendiente
+según el orden del itinerario. Se mantiene el avance local anterior de la versión secuencial.
+En escritorio, mapa y tarjetas conviven lado a lado. En teléfono, el mapa queda arriba de las tarjetas y
+«Ver mapa completo» permite plegar el panel; «Ver tarjetas» lo restaura.
+
+Desde la ficha de un destino del catálogo o una tarjeta del viaje, «Agregar a un viaje» permite elegir
+un viaje propio, día y costo en su moneda. Se conserva el viaje de origen: esta acción copia/agrega,
+no traslada ni borra la parada original. El guardado usa el RPC transaccional existente con control de versión.
+No requiere otra migración SQL. Para nuevas paradas personalizadas sin coordenadas, confirmar ubicación en el viaje de destino.
