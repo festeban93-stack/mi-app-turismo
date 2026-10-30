@@ -136,3 +136,17 @@ El diccionario local cubre la interfaz pública de exploración, acceso a la cue
 Los nombres de destinos, notas de usuarios y contenido obtenido de proveedores mantienen su idioma original;
 no se envían automáticamente a un traductor externo. Los valores internos de categorías permanecen en español
 para mantener compatibilidad con filtros y datos existentes. No requiere migración SQL ni variables nuevas.
+
+### Descubrimiento por experiencia
+
+«Comenzar» lleva de `/` a `/discover`, una selección gráfica de Gastronomía, Naturaleza, Aventura y Cultura.
+El fondo cambia con transición al pasar el cursor, enfocar con teclado o elegir una experiencia.
+Cada categoría abre una subsección con búsqueda y tarjetas tomadas de `/api/spots`, el mismo catálogo del mapa.
+Se exige `is_verified=true` y `verification_status=approved`; no se inventan destinos para llenar categorías vacías.
+Los destinos nuevos aparecen tras su aprobación al volver a cargar la página. Se respeta el límite actual de 1000 registros del endpoint.
+Las categorías no incluidas en estas cuatro (por ejemplo, hospedaje) siguen disponibles en el mapa completo.
+
+Las tarjetas permiten ver el destino en `/explore?category=...&spot=...`, abrir Google Maps y agregarlo a un viaje propio.
+Se conservan el idioma ES/EN y el acceso a la cuenta existente. Los enlaces de categoría y de destino mantienen sus valores internos estables.
+Las cuatro fotos de fondo tienen créditos y fuentes en `public/photos/credits.json`; las tarjetas usan la foto del propio destino o indican su ausencia.
+No requiere nuevas tablas ni migraciones SQL.

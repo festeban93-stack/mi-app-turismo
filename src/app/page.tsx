@@ -44,7 +44,7 @@ export default function PiHome() {
    <h1 className="max-w-[1080px] text-[clamp(2.65rem,5.4vw,6.6rem)] font-bold leading-[1.08] tracking-[-.055em]">{t('Un poquito de aventura.')}<br/><span className="inline-block pt-3">{t('Un montón de')} <span className="text-[#e0eca8]">pura vida.</span></span></h1>
    <p className="mt-7 max-w-[760px] text-base leading-relaxed text-white/90 sm:mt-10 sm:text-lg lg:text-xl">{t('Montañas, playas y esos rincones que todavía no conocés. Armá un viaje que se sienta muy vos.')}</p>
    <div className="mt-9 flex flex-wrap gap-3 sm:mt-12">
-    <Link href="/explore" className="flex min-h-16 w-full items-center justify-between gap-10 rounded-2xl bg-[#f5f6ea] px-7 py-5 font-bold text-[#214f43] shadow-lg transition hover:bg-white sm:w-auto sm:min-w-72">{t('Ir al mapa')}<ArrowUpRight size={22}/></Link>
+    <Link href="/discover" className="flex min-h-16 w-full items-center justify-between gap-10 rounded-2xl bg-[#f5f6ea] px-7 py-5 font-bold text-[#214f43] shadow-lg transition hover:bg-white sm:w-auto sm:min-w-72">{t('Comenzar')}<ArrowUpRight size={22}/></Link>
     <Link href="/explore?view=trips" className="flex min-h-16 w-full items-center justify-center gap-3 rounded-2xl border border-white/40 px-7 py-5 font-bold backdrop-blur-sm transition hover:bg-white/10 sm:w-auto">{t('Mis viajes')}<ArrowRight size={18}/></Link>
    </div>
   </section>

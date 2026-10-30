@@ -43,5 +43,45 @@
       2448
     ],
     "changes": "Resized to 1920 px wide, encoded as WebP; responsive display crop and contrast overlay."
+  },
+  {
+    "file": "gastronomia.webp",
+    "credit": "La Teja",
+    "source": "https://www.lateja.cr/nacional/ni-la-lluvia-ni-el-frio-apagan-el-fieston-que/7QDAOAWV6RAIDEZBCBWKSDZ3EM/story/",
+    "original_dimensions": [
+      1600,
+      1200
+    ],
+    "changes": "WebP optimization without upscaling; responsive display crop and contrast overlay."
+  },
+  {
+    "file": "braulio.webp",
+    "credit": "La Nación",
+    "source": "https://www.nacion.com/el-pais/parque-nacional-braulio-carrillo-cierra-sector-del/XKRLVAP6KNHGZHNJS4CGK3RO3M/story/",
+    "original_dimensions": [
+      1440,
+      1054
+    ],
+    "changes": "WebP optimization without upscaling; responsive display crop and contrast overlay."
+  },
+  {
+    "file": "osa.webp",
+    "credit": "Dolphin Quest · Golfo Dulce",
+    "source": "https://www.dolphinquestcr.com/activities",
+    "original_dimensions": [
+      2500,
+      1667
+    ],
+    "changes": "WebP optimization without upscaling; responsive display crop and contrast overlay."
+  },
+  {
+    "file": "festival.webp",
+    "credit": "La Nación · Festival de la Luz 2024",
+    "source": "https://www.nacion.com/viva/festival-de-la-luz-2024-vea-todas-las-carrozas-que/LAAQKK5FE5F4ZO5CJCDVCOV4YI/story/",
+    "original_dimensions": [
+      3696,
+      2456
+    ],
+    "changes": "WebP optimization without upscaling; responsive display crop and contrast overlay."
   }
 ]
