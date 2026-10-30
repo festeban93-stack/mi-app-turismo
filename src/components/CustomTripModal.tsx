@@ -151,6 +151,10 @@ export default function CustomTripModal({
       return;
     }
 
+    if (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 30 || selectedSpots.some(item => item.day < 1 || item.day > durationDays)) {
+      alert('Revisá la duración: todas las paradas deben estar dentro de los días elegidos.');
+      return;
+    }
     if (loading) return;
     setLoading(true);
 

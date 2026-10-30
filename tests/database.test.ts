@@ -46,6 +46,7 @@ async function database() {
     await db.exec(`CREATE POLICY "${policy.policyname}" ON public.${policy.tablename} AS ${policy.permissive} FOR ${policy.cmd} TO ${roles} ${policy.qual?`USING (${policy.qual})`:''} ${policy.with_check?`WITH CHECK (${policy.with_check})`:''}`);
   }
   await db.exec(await readFile(new URL('../supabase/migrations/202610290001_security_and_atomic_trips.sql', import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/20261030020434_editable_itineraries.sql', import.meta.url),'utf8'));
   return db;
 }
 async function signIn(db: PGlite, id = owner, email = 'owner@example.com') {
@@ -192,5 +193,48 @@ test('manual verification query passes against the migrated database', async () 
     const {rows}=await db.query<{comprobacion:string;correcto:boolean}>(query);
     assert.equal(rows.length,8);
     for(const row of rows) assert.equal(row.correcto,true,row.comprobacion);
+  } finally { await db.close(); }
+});
+
+async function edit(db: PGlite, id: string, version = 0, stopList = [
+  { custom_title: 'Puerto Viejo', day_number: 1, estimated_cost: 25, notes: 'Hotel' },
+  { spot_id: spot, custom_title: 'Cahuita', day_number: 2, estimated_cost: 10, notes: 'Sendero' },
+  { custom_title: 'Sixaola', day_number: 2, estimated_cost: 5, notes: 'Última parada' },
+]) {
+  return db.query<{ update_trip_with_stops: { edit_version: number } }>(
+    'SELECT public.update_trip_with_stops($1,$2,$3,$4,$5,$6,$7,$8::jsonb)',
+    [id, version, 'Puerto viejo por pista', 2, 'Llevar impermeable', 100, 'USD', JSON.stringify(stopList)]);
+}
+test('saved trip edit persists two days, ordered same-day stops, budget and notes; stale edit rolls back', async () => {
+  const db = await database();
+  try {
+    await signIn(db);
+    const id = (await save(db)).rows[0].create_trip_with_stops.id;
+    assert.equal((await edit(db, id)).rows[0].update_trip_with_stops.edit_version, 1);
+    const trip = (await db.query<{ duration_days: number; notes: string; budget_limit: string }>('SELECT * FROM trips')).rows[0];
+    assert.equal(trip.duration_days, 2);
+    assert.equal(trip.notes, 'Llevar impermeable');
+    assert.equal(Number(trip.budget_limit), 100);
+    const savedStops = (await db.query<{ day_number: number; custom_title: string; notes: string }>('SELECT * FROM trip_spots ORDER BY day_number,order_index')).rows;
+    assert.deepEqual(savedStops.map(s => s.day_number), [1, 2, 2]);
+    assert.equal(savedStops[2].notes, 'Última parada');
+    await assert.rejects(edit(db, id), /TRIP_CONFLICT/);
+    assert.deepEqual((await db.query('SELECT * FROM trip_spots ORDER BY day_number,order_index')).rows, savedStops);
+    await assert.rejects(edit(db, id, 1, [{ custom_title: 'Fuera', day_number: 3, estimated_cost: 0, notes: '' }]));
+    assert.equal((await db.query<{ edit_version: number }>('SELECT edit_version FROM trips')).rows[0].edit_version, 1);
+    assert.equal((await db.query('SELECT * FROM trip_spots')).rows.length, 3);
+  } finally { await db.close(); }
+});
+test('outside users and invited editors cannot overwrite an owner trip via edit RPC', async () => {
+  const db = await database();
+  try {
+    await signIn(db);
+    const id = (await save(db, ['friend@example.com'])).rows[0].create_trip_with_stops.id;
+    await signIn(db, other, 'friend@example.com');
+    await assert.rejects(edit(db, id), /not owned/);
+    await signIn(db, other, 'outsider@example.com');
+    await assert.rejects(edit(db, id), /not owned/);
+    await signIn(db);
+    assert.equal((await db.query('SELECT * FROM trip_spots')).rows.length, 1);
   } finally { await db.close(); }
 });

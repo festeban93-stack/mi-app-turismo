@@ -43,6 +43,7 @@ export default function AICopilotDrawer({
     }
   ]);
 
+  const [routeDays, setRouteDays] = useState<Record<number, number>>({});
   const [inputPrompt, setInputPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [savingTripId, setSavingTripId] = useState<string | null>(null);
@@ -105,7 +106,7 @@ export default function AICopilotDrawer({
     }
   };
 
-  const handleSaveAIRouteToMyTrips = async (spots: any[], originalPrompt: string) => {
+  const handleSaveAIRouteToMyTrips = async (spots: any[], originalPrompt: string, durationDays: number) => {
     if (!spots || spots.length === 0) return;
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -120,10 +121,10 @@ export default function AICopilotDrawer({
       const tripTitle = `Viaje IA: ${originalPrompt.slice(0, 25)}...`;
 
       await saveTrip({
-        title: tripTitle, durationDays: Math.ceil(spots.length / 2) || 1,
+        title: tripTitle, durationDays,
         aiPrompt: originalPrompt,
         stops: spots.map((spot, index) => ({
-          spot_id: spot.id, day_number: Math.floor(index / 2) + 1,
+          spot_id: spot.id, day_number: Math.min(durationDays, Math.floor(index * durationDays / spots.length) + 1),
           order_index: index, estimated_cost: 0,
         })),
       });
@@ -197,8 +198,13 @@ export default function AICopilotDrawer({
                     </span>
                   </div>
 
+                  <label className="block text-xs font-bold">Duración del viaje (días)
+                    <input aria-label="Duración de la ruta IA" type="number" min={1} max={30} value={routeDays[index] ?? 2}
+                      onChange={e => setRouteDays(prev => ({ ...prev, [index]: Math.max(1, Math.min(30, Number(e.target.value) || 1)) }))}
+                      className="w-full rounded-lg border p-2 bg-white text-slate-900" />
+                  </label>
                   <button
-                    onClick={() => handleSaveAIRouteToMyTrips(msg.suggestedSpots!, messages[index - 1]?.content || 'Ruta IA')}
+                    onClick={() => handleSaveAIRouteToMyTrips(msg.suggestedSpots!, messages[index - 1]?.content || 'Ruta IA', routeDays[index] ?? 2)}
                     disabled={savingTripId === messages[index - 1]?.content}
                     className="w-full py-2 px-3 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-950 hover:bg-slate-800 font-bold text-[10px] shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >

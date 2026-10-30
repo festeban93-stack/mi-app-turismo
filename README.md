@@ -73,3 +73,24 @@ npm run build
 ```
 
 Las pruebas no usan credenciales reales ni llaman a servicios de producción. Cubren autenticación, autorización, moderación, geometrías inválidas, límites de archivos y cuotas, y transacciones/RLS en PostgreSQL local mediante PGlite. `npm run lint` conserva advertencias sobre tipos `any`, dependencias de hooks y otros aspectos heredados; los errores sí hacen fallar el comando. `typecheck` y la compilación verifican TypeScript sin omitir errores.
+
+### Edición de itinerarios guardados
+
+Antes de desplegar la edición, ejecutar en el SQL Editor de Supabase el archivo
+`supabase/migrations/20261030020434_editable_itineraries.sql` completo (requiere la migración anterior).
+Agrega notas del viaje, presupuesto disponible, moneda y versión de edición, sin modificar los viajes existentes.
+La función `update_trip_with_stops` guarda nombre, duración y paradas en una sola transacción bajo RLS;
+solo la persona propietaria puede reemplazar el itinerario completo. Los permisos de colaboradores existentes se mantienen.
+
+En **Mis Viajes → abrir viaje → Editar viaje, ruta y presupuesto** se pueden agregar, quitar y
+ordenar varias paradas por día, modificar costos y anotar reservas u otra información.
+Reducir la duración exige reasignar las paradas fuera de rango; nunca aumenta los días ni elimina paradas automáticamente.
+La moneda (USD/CRC) es común a todos los importes y no hace conversión de divisas.
+Las paradas personalizadas sin coordenadas se guardan en el itinerario; solo los destinos vinculados al catálogo se trazan en el mapa.
+Si otra sesión guarda antes, la versión impide sobrescribir ese cambio: cancelar, reabrir el viaje y volver a editar.
+
+Verificación manual tras ejecutar la migración:
+```sql
+select to_regprocedure('public.update_trip_with_stops(uuid,integer,text,integer,text,numeric,text,jsonb)') is not null as editor_instalado;
+```
+Luego editar un viaje a 2 días con tres paradas (días 1, 2, 2), guardar, cerrarlo y volver a abrirlo para verificar persistencia.
