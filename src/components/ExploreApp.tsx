@@ -13,6 +13,7 @@ import AuthModal from '@/components/AuthModal';
 import UserProfileModal from '@/components/UserProfileModal';
 import CustomTripModal from '@/components/CustomTripModal';
 import MyTripsDrawer from '@/components/MyTripsDrawer';
+import {experienceId} from '@/lib/discovery';
 import { Plus, Bot, Trash2, User, Compass, BookmarkCheck } from 'lucide-react';
 
 const MapWithNoSSR = dynamic(() => import('@/components/MapClient'), {
@@ -47,6 +48,11 @@ export default function HomePage() {
   const [activeCategory, setActiveCategory] = useState<string>('Todas');
   const [activeSearchQuery, setActiveSearchQuery] = useState<string>('');
   
+  useEffect(()=>{
+    const id=experienceId(new URLSearchParams(location.search).get('category'));
+    if(id)queueMicrotask(()=>setActiveCategory(id));
+  },[]);
+
   // Estado de Autenticación
   const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -143,6 +149,12 @@ export default function HomePage() {
     }
   };
 
+  useEffect(()=>{
+    const id=new URLSearchParams(location.search).get('spot');
+    const spot=spots.find(s=>s.id===id);
+    if(spot)queueMicrotask(()=>setSelectedSpot(spot));
+  },[spots]);
+
   const filteredSpots = useMemo(() => {
     return spots.filter((spot) => {
       const catNorm = normalizeText(spot.category);
@@ -202,13 +214,14 @@ export default function HomePage() {
         </div>
 
         <div className="flex items-center gap-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 p-1 rounded-xl shadow-md overflow-x-auto max-w-[180px] sm:max-w-none custom-scrollbar">
-          {[t("Todas"), 'gastronomia', 'naturaleza', 'aventura', 'cultura'].map((cat) => {
+          {['Todas', 'gastronomia', 'naturaleza', 'aventura', 'cultura'].map((cat) => {
             const isSelected = activeCategory.toLowerCase() === cat.toLowerCase();
             return (
               <button
-                key={t(cat)}
+                key={cat}
                 onClick={() => {
                   setActiveCategory(cat);
+                  setSelectedSpot(null);
                   setActiveSearchQuery('');
                 }}
                 className={`px-2 py-0.5 rounded-lg text-[10px] font-bold capitalize whitespace-nowrap transition-all ${
@@ -217,7 +230,7 @@ export default function HomePage() {
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                {t(cat)}
+                {t(cat === 'gastronomia' ? 'Gastronomía' : cat.charAt(0).toUpperCase()+cat.slice(1))}
               </button>
             );
           })}
@@ -308,6 +321,7 @@ export default function HomePage() {
               featuredSpots={filteredSpots.slice(0, 5)}
               onSelectCategory={(cat) => {
                 setActiveCategory(cat);
+                  setSelectedSpot(null);
                 setActiveSearchQuery('');
               }}
               onSelectSpot={(spot) => setSelectedSpot(spot)}
