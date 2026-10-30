@@ -107,7 +107,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
                 {emailConfirmationSent ? t("Verificá tu Correo") : isSignUp ? t("Crear Cuenta") : t("Iniciar Sesión")}
               </h3>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">Pi · Costa Rica</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">MapAI · Costa Rica</p>
             </div>
           </div>
           <button
@@ -125,7 +125,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
             <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
               {t(" ¡Enlace de Activación Enviado! ")}</h4>
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              {t(" Enviamos un correo a ")}<strong className="text-emerald-600 dark:text-emerald-400">{email}</strong>{t(". Por favor abrí el enlace para activar tu cuenta en Pi. ")}</p>
+              {t(" Enviamos un correo a ")}<strong className="text-emerald-600 dark:text-emerald-400">{email}</strong>{t(". Por favor abrí el enlace para activar tu cuenta en MapAI. ")}</p>
             <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 text-left">
               {t(" 💡 Si no lo encontrás en un par de minutos, revisá tu carpeta de ")}<strong>{t("Spam / Correo no deseado")}</strong>.
             </div>

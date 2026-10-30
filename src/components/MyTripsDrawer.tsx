@@ -266,7 +266,7 @@ export default function MyTripsDrawer({
       </div>
 
       <div className={`${travelStops && mapOnly ? 'hidden md:block' : ''} p-3 text-center text-[10px] text-slate-400 border-t border-slate-200 dark:border-slate-800`}>
-        {t(" Pi • Integración IA + Colaborativo ")}</div>
+        {t(" MapAI • Integración IA + Colaborativo ")}</div>
 
     </div>
   );
