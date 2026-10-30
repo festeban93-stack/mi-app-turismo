@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
           address_text: el.tags['addr:city'] || el.tags['addr:province'] || 'Costa Rica',
           opening_hours: el.tags.opening_hours || 'Sin confirmar',
           entry_fee: 'Sin confirmar',
-          is_verified: false, verification_status: 'pending', source_type: 'osm'
+          is_verified: false, verification_status: 'pending', source_type: 'crowdsourcing', metadata: { import_origin: 'osm' }
         };
       });
 

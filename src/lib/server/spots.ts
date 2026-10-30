@@ -9,7 +9,7 @@ function text(value: unknown, fallback: string, max: number) {
 export function validCoordinates(lat: number, lng: number) {
   return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 }
-export function pendingSpot(body: Record<string, unknown>, source = 'crowdsource') {
+export function pendingSpot(body: Record<string, unknown>, source = 'crowdsourcing') {
   if (!body || typeof body !== 'object') throw new BodyError('Destino inválido.');
   const title = text(body.title, '', 200);
   const lat = typeof body.latitude === 'number' || typeof body.latitude === 'string' && body.latitude.trim() ? Number(body.latitude) : NaN;
@@ -29,6 +29,7 @@ export function pendingSpot(body: Record<string, unknown>, source = 'crowdsource
     entry_fee: text(body.entry_fee, 'Sin confirmar', 200),
     image_url: image || null,
     explorer_nickname: text(body.explorer_nickname, 'Explorador Anónimo', 100),
-    source_type: source, is_verified: false, verification_status: 'pending',
+    source_type: source === 'ai_scraper' ? 'ai_scraper' : 'crowdsourcing',
+    metadata: { import_origin: source, security_review_20261029: true }, is_verified: false, verification_status: 'pending',
   };
 }

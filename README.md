@@ -18,15 +18,20 @@ Completá las variables con los valores de tu proyecto Supabase. Nunca publiques
 
 1. Respaldá la base de datos y probá primero en un proyecto de desarrollo con el mismo esquema.
 2. Ejecutá **una vez**, como administrador desde SQL Editor, `supabase/migrations/202610290001_security_and_atomic_trips.sql`.
-3. Confirmá que el bucket `spot-images` existe y permite lectura pública de sus imágenes. Las escrituras pasan exclusivamente por la API autenticada, que valida las imágenes y las convierte a WebP.
-4. Configurá las variables del servidor y desplegá esta versión de la aplicación después de aplicar la migración.
-5. Iniciá sesión y comprobá un aporte, una aprobación y un itinerario completo.
+3. Ejecutá la consulta de solo lectura `supabase/verification/security_and_trips.sql` y revisá las ocho comprobaciones. Si alguna devuelve `false`, resolvé ese punto antes de desplegar.
+4. Confirmá que el bucket `spot-images` existe y permite lectura pública de sus imágenes. Las escrituras pasan exclusivamente por la API autenticada, que valida las imágenes y las convierte a WebP.
+5. Configurá las variables del servidor y desplegá esta versión de la aplicación después de aplicar la migración.
+6. Iniciá sesión y comprobá un aporte, una aprobación y un itinerario completo.
 
 La migración asume las tablas que ya usa la aplicación: `spots` (incluye `source_type`, `location` y `created_at`), `trips` (`owner_id`, `title`, `duration_days`, `is_ai_generated`, `ai_prompt`), `trip_spots` (`trip_id`, `spot_id`, `custom_title`, `custom_address`, `day_number`, `order_index`, `estimated_cost`) y `trip_collaborators` (`trip_id`, `invited_email`, `role`). No crea el esquema inicial de una aplicación vacía. Los tipos de IDs se toman de las tablas existentes. Si el esquema difiere, revisá la migración antes de ejecutarla; una falla revierte toda la migración.
 
-La migración habilita RLS y agrega políticas restrictivas para destinos y escrituras de viajes. Conserva las políticas existentes: revisá también las políticas de lectura de viajes, perfiles, reclamos y cualquier RPC anterior en tu proyecto real. Las pruebas locales verifican un esquema representativo; no sustituyen esa revisión del entorno real.
+La migración reemplaza las políticas de las cuatro tablas revisadas (`spots`, `trips`, `trip_spots`, `trip_collaborators`), porque la exportación real incluía escritura pública y acceso global de usuarios autenticados. Se mantienen los viajes y sus relaciones: el propietario administra el viaje y sus invitaciones, un editor invitado puede modificar paradas y un invitado de lectura solo puede leer. El esquema interno `app_private` evita recursión entre políticas y NO debe exponerse en Data API. Revisá por separado perfiles, reclamos, vistas y RPC anteriores; no se modifican en esta migración.
 
-Los destinos generados por los antiguos importadores de IA se ponen pendientes de revisión. Los registros sin aprobación explícita dejan de aparecer públicamente. No se eliminan destinos. Revisá además cualquier dato histórico importado desde otras fuentes que no tenga un `source_type` identificable.
+Los destinos generados por los antiguos importadores de IA se ponen pendientes de revisión una sola vez; una marca en `metadata` permite repetir el archivo sin volver a ocultar registros revisados después. Los registros sin aprobación explícita dejan de aparecer públicamente. No se eliminan destinos. Revisá además cualquier dato histórico importado desde otras fuentes que no tenga un `source_type` identificable.
+
+La adaptación usa los valores reales de `public.data_source`: `crowdsourcing`, `ai_scraper` y `b2b_verified`. Las importaciones OSM y administrativas usan `crowdsourcing` y guardan su procedencia en `metadata.import_origin`; nunca crean etiquetas de enum inexistentes. Los nuevos horarios y tarifas quedan sin confirmar por defecto, y no se asigna una calificación de cinco estrellas por defecto. Los valores históricos existentes no se sustituyen indiscriminadamente.
+
+La prueba de regresión carga las políticas exportadas del proyecto y el enum real antes de ejecutar la migración. Comprueba la privacidad entre cuentas, la edición por invitación, la lectura sin edición, el rechazo de auto-invitaciones y la repetición del archivo sin pérdida de viajes.
 
 ## Cuenta administradora y moderación
 

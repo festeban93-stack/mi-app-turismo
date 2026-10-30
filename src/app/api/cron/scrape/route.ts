@@ -92,7 +92,7 @@ export async function GET(request: Request) {
               location: `SRID=4326;POINT(${lng} ${lat})`,
               address_text: randomZone.name, description: 'Importado de OpenStreetMap; pendiente de revisión.',
               opening_hours: 'Sin confirmar', entry_fee: 'Sin confirmar',
-              source_type: 'osm', is_verified: false, verification_status: 'pending'
+              source_type: 'crowdsourcing', metadata: { import_origin: 'osm' }, is_verified: false, verification_status: 'pending'
             })
           });
 

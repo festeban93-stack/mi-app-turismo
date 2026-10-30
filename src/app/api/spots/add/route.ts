@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     if (!spot.image_url?.startsWith(imagePrefix)) throw new BodyError('Subí una fotografía desde tu cuenta.');
     const denied = await consumeQuota(access.user.id, 'spot');
     if (denied) return denied;
-    const { data, error } = await serviceClient().from('spots').insert(spot).select('id,title,verification_status').single();
+    const { data, error } = await serviceClient().from('spots').insert({ ...spot, user_id: access.user.id }).select('id,title,verification_status').single();
     if (error) throw error;
     return NextResponse.json({ success: true, spot: data, message: 'Destino enviado a revisión. Aparecerá en el mapa cuando sea aprobado.' }, { status: 201 });
   } catch (error) {

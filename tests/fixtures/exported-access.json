@@ -1,0 +1,192 @@
+{
+  "valores_source_type": [
+    "crowdsourcing",
+    "ai_scraper",
+    "b2b_verified"
+  ],
+  "politicas_acceso": [
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "anon",
+        "authenticated",
+        "service_role"
+      ],
+      "tablename": "spots",
+      "permissive": "PERMISSIVE",
+      "policyname": "Permitir insercion en spots",
+      "schemaname": "public",
+      "with_check": "true"
+    },
+    {
+      "cmd": "ALL",
+      "qual": "true",
+      "roles": [
+        "public"
+      ],
+      "tablename": "spots",
+      "permissive": "PERMISSIVE",
+      "policyname": "Permitir insercion y escritura de spots",
+      "schemaname": "public",
+      "with_check": "true"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "true",
+      "roles": [
+        "public"
+      ],
+      "tablename": "spots",
+      "permissive": "PERMISSIVE",
+      "policyname": "Permitir lectura publica de spots",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "ALL",
+      "qual": "true",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "trip_collaborators",
+      "permissive": "PERMISSIVE",
+      "policyname": "Permisos de colaboracion",
+      "schemaname": "public",
+      "with_check": "true"
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "trips",
+      "permissive": "PERMISSIVE",
+      "policyname": "Propietarios crean viajes",
+      "schemaname": "public",
+      "with_check": "(auth.uid() = owner_id)"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((auth.uid() = owner_id) OR (EXISTS ( SELECT 1\n   FROM trip_collaborators\n  WHERE ((trip_collaborators.trip_id = trips.id) AND ((trip_collaborators.user_id = auth.uid()) OR (trip_collaborators.invited_email = (auth.jwt() ->> 'email'::text)))))))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "trips",
+      "permissive": "PERMISSIVE",
+      "policyname": "Propietarios y colaboradores ven sus viajes",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "ALL",
+      "qual": "(EXISTS ( SELECT 1\n   FROM (trips t\n     LEFT JOIN trip_collaborators c ON ((c.trip_id = t.id)))\n  WHERE ((t.id = trip_spots.trip_id) AND ((t.owner_id = auth.uid()) OR (c.user_id = auth.uid()) OR (c.invited_email = (auth.jwt() ->> 'email'::text))))))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "trip_spots",
+      "permissive": "PERMISSIVE",
+      "policyname": "Editores gestionan trip_spots",
+      "schemaname": "public",
+      "with_check": "(EXISTS ( SELECT 1\n   FROM (trips t\n     LEFT JOIN trip_collaborators c ON ((c.trip_id = t.id)))\n  WHERE ((t.id = trip_spots.trip_id) AND ((t.owner_id = auth.uid()) OR (c.user_id = auth.uid()) OR (c.invited_email = (auth.jwt() ->> 'email'::text))))))"
+    },
+    {
+      "cmd": "ALL",
+      "qual": "true",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "trip_spots",
+      "permissive": "PERMISSIVE",
+      "policyname": "Permisos de lectura en trip_spots",
+      "schemaname": "public",
+      "with_check": "true"
+    }
+  ],
+  "restricciones_tablas": [
+    {
+      "tabla": "spots",
+      "nombre": "spots_owner_id_fkey",
+      "definicion": "FOREIGN KEY (owner_id) REFERENCES auth.users(id)"
+    },
+    {
+      "tabla": "spots",
+      "nombre": "spots_pkey",
+      "definicion": "PRIMARY KEY (id)"
+    },
+    {
+      "tabla": "spots",
+      "nombre": "spots_title_key",
+      "definicion": "UNIQUE (title)"
+    },
+    {
+      "tabla": "spots",
+      "nombre": "spots_user_id_fkey",
+      "definicion": "FOREIGN KEY (user_id) REFERENCES auth.users(id)"
+    },
+    {
+      "tabla": "trip_collaborators",
+      "nombre": "trip_collaborators_pkey",
+      "definicion": "PRIMARY KEY (id)"
+    },
+    {
+      "tabla": "trip_collaborators",
+      "nombre": "trip_collaborators_trip_id_fkey",
+      "definicion": "FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE"
+    },
+    {
+      "tabla": "trip_collaborators",
+      "nombre": "trip_collaborators_trip_id_invited_email_key",
+      "definicion": "UNIQUE (trip_id, invited_email)"
+    },
+    {
+      "tabla": "trip_collaborators",
+      "nombre": "trip_collaborators_user_id_fkey",
+      "definicion": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "tabla": "trip_spots",
+      "nombre": "trip_spots_pkey",
+      "definicion": "PRIMARY KEY (id)"
+    },
+    {
+      "tabla": "trip_spots",
+      "nombre": "trip_spots_spot_id_fkey",
+      "definicion": "FOREIGN KEY (spot_id) REFERENCES spots(id) ON DELETE CASCADE"
+    },
+    {
+      "tabla": "trip_spots",
+      "nombre": "trip_spots_trip_id_fkey",
+      "definicion": "FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE"
+    },
+    {
+      "tabla": "trips",
+      "nombre": "trips_owner_id_fkey",
+      "definicion": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "tabla": "trips",
+      "nombre": "trips_pkey",
+      "definicion": "PRIMARY KEY (id)"
+    }
+  ],
+  "estado_rls": [
+    {
+      "tabla": "spots",
+      "rls_activo": true
+    },
+    {
+      "tabla": "trip_collaborators",
+      "rls_activo": true
+    },
+    {
+      "tabla": "trip_spots",
+      "rls_activo": true
+    },
+    {
+      "tabla": "trips",
+      "rls_activo": true
+    }
+  ]
+}

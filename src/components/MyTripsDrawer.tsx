@@ -40,12 +40,12 @@ export default function MyTripsDrawer({
 
   async function fetchUserTrips() {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('trips')
         .select('*')
-        .eq('owner_id', currentUser.id)
         .order('created_at', { ascending: false });
 
+      if (error) throw error;
       return data;
     } catch (err) {
       console.error('Error cargando viajes:', err);
@@ -67,12 +67,13 @@ export default function MyTripsDrawer({
     setSelectedTrip(trip);
     setLoading(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('trip_spots')
         .select('*, spots(*)')
         .eq('trip_id', trip.id)
-        .order('day_number', { ascending: true });
+        .order('day_number', { ascending: true }).order('order_index', { ascending: true });
 
+      if (error) throw error;
       if (data) {
         setTripSpots(data);
         const route = data.filter(d => d.spots).map(d => d.spots);

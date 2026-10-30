@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     // Inserción masiva ignorando duplicados por título
     const { data, error } = await supabaseAdmin
       .from('spots')
-      .upsert(spots.map((spot) => pendingSpot(spot, 'admin_import')), { onConflict: 'title', ignoreDuplicates: true }).select('id');
+      .upsert(spots.map((spot) => pendingSpot(spot, spot?.metadata?.import_origin === 'osm' ? 'osm' : 'admin_import')), { onConflict: 'title', ignoreDuplicates: true }).select('id');
 
     if (error) {
       console.error('Error insertando spots en Supabase:', error);

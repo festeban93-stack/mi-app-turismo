@@ -190,6 +190,7 @@ export async function POST(request: Request) {
         opening_hours: spot.opening_hours || 'Sin confirmar',
         entry_fee: spot.entry_fee || 'Sin confirmar',
         source_type: 'ai_scraper',
+        metadata: { import_origin: 'ai_scraper', security_review_20261029: true },
         is_verified: false,
         verification_status: 'pending',
       };

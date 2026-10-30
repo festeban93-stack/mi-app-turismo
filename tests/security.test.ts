@@ -171,3 +171,13 @@ test('failed OpenStreetMap retrieval never manufactures or saves destinations', 
   assert.equal(response.status,502);
   assert.ok(calls.every(url=>!url.includes('supabase.test')));
 });
+
+test('all imported sources use the real enum values and keep source provenance in metadata', () => {
+  for (const source of ['crowdsourcing','admin_import','osm','ai_scraper']) {
+    const spot=pendingSpot({title:'Destino',latitude:9.7,longitude:-82.8,source_type:'b2b_verified',metadata:{import_origin:'forged'}},source);
+    assert.ok(['crowdsourcing','ai_scraper','b2b_verified'].includes(spot.source_type));
+    assert.equal(spot.source_type,source==='ai_scraper'?'ai_scraper':'crowdsourcing');
+    assert.equal(spot.metadata.import_origin,source);
+    assert.equal(spot.is_verified,false);
+  }
+});

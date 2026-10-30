@@ -1,31 +1,126 @@
--- Apply in Supabase SQL Editor as postgres, before deploying the application.
--- Existing tables trips, trip_spots, trip_collaborators and spots are prerequisites.
+-- Compatible with the exported production schema: UUID IDs and public.data_source enum.
+-- Run the WHOLE file in SQL Editor as postgres before deploying the application.
+-- Replaces policies only on spots, trips, trip_spots and trip_collaborators.
 BEGIN;
+SET LOCAL lock_timeout = '5s';
+
+-- Abort rather than partially modifying a project with an unexpected schema.
+DO $$
+BEGIN
+  IF to_regclass('public.spots') IS NULL OR to_regclass('public.trips') IS NULL
+    OR to_regclass('public.trip_spots') IS NULL OR to_regclass('public.trip_collaborators') IS NULL THEN
+    RAISE EXCEPTION 'Required application tables are missing';
+  END IF;
+END $$;
 
 ALTER TABLE public.spots ADD COLUMN IF NOT EXISTS verification_status text DEFAULT 'pending';
-ALTER TABLE public.spots ADD COLUMN IF NOT EXISTS is_verified boolean NOT NULL DEFAULT false;
--- Importers historically labelled generated data verified. Quarantine, do not delete.
-UPDATE public.spots SET is_verified = false, verification_status = 'pending'
-WHERE source_type IN ('ai_scraper', 'ai', 'blog-scraped', 'viral', 'social');
+ALTER TABLE public.spots ADD COLUMN IF NOT EXISTS is_verified boolean DEFAULT false;
+-- Defaults describe unknown information; existing values are preserved.
+ALTER TABLE public.spots ALTER COLUMN opening_hours SET DEFAULT 'Sin confirmar';
+ALTER TABLE public.spots ALTER COLUMN entry_fee SET DEFAULT 'Sin confirmar';
+ALTER TABLE public.spots ALTER COLUMN rating_avg DROP DEFAULT;
+-- Review old generated records once, retaining all rows and original metadata.
+UPDATE public.spots SET is_verified = false, verification_status = 'pending',
+  metadata = coalesce(metadata, '{}'::jsonb) || '{"security_review_20261029":true}'::jsonb
+WHERE source_type::text = 'ai_scraper'
+  AND NOT coalesce(metadata, '{}'::jsonb) ? 'security_review_20261029';
 UPDATE public.spots SET verification_status = 'pending' WHERE verification_status IS NULL;
 
+-- The exported policies contained USING(true)/WITH CHECK(true) for public writes
+-- and all authenticated trip rows. Replace the complete policy sets, not just add
+-- permissive rules that would be OR-ed with those unsafe policies.
+DO $$
+DECLARE item record;
+BEGIN
+  FOR item IN SELECT schemaname, tablename, policyname FROM pg_policies
+    WHERE schemaname = 'public' AND tablename IN ('spots','trips','trip_spots','trip_collaborators')
+  LOOP
+    EXECUTE format('DROP POLICY %I ON %I.%I', item.policyname, item.schemaname, item.tablename);
+  END LOOP;
+END $$;
 ALTER TABLE public.spots ENABLE ROW LEVEL SECURITY;
--- Restrictive policies also constrain any older, overly broad permissive policies.
-CREATE POLICY spots_public_guard ON public.spots AS RESTRICTIVE FOR SELECT TO anon, authenticated
-USING ((is_verified IS TRUE AND verification_status = 'approved') OR (auth.jwt()->'app_metadata'->>'role' = 'admin'));
-CREATE POLICY spots_public_read ON public.spots FOR SELECT TO anon, authenticated
+ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trip_spots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trip_collaborators ENABLE ROW LEVEL SECURITY;
+
+-- RLS does not protect TRUNCATE; reset table-level grants as well.
+REVOKE ALL ON public.spots, public.trips, public.trip_spots, public.trip_collaborators FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.spots TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.trips, public.trip_spots, public.trip_collaborators TO authenticated;
+GRANT ALL ON public.spots, public.trips, public.trip_spots, public.trip_collaborators TO service_role;
+
+CREATE POLICY spots_approved_read ON public.spots FOR SELECT TO anon, authenticated
 USING (is_verified IS TRUE AND verification_status = 'approved');
 CREATE POLICY spots_admin_read ON public.spots FOR SELECT TO authenticated
-USING (auth.jwt()->'app_metadata'->>'role' = 'admin');
-CREATE POLICY spots_insert_guard ON public.spots AS RESTRICTIVE FOR INSERT TO anon, authenticated
-WITH CHECK (auth.jwt()->'app_metadata'->>'role' = 'admin');
-CREATE POLICY spots_update_guard ON public.spots AS RESTRICTIVE FOR UPDATE TO anon, authenticated
-USING (auth.jwt()->'app_metadata'->>'role' = 'admin') WITH CHECK (auth.jwt()->'app_metadata'->>'role' = 'admin');
-CREATE POLICY spots_delete_guard ON public.spots AS RESTRICTIVE FOR DELETE TO anon, authenticated
-USING (auth.jwt()->'app_metadata'->>'role' = 'admin');
+USING (((select auth.jwt())->'app_metadata'->>'role') = 'admin');
+-- No browser writes to spots: authenticated server endpoints enforce moderation.
+
+-- Internal membership lookup avoids circular RLS between trips and invitations.
+-- This schema must NOT be added to Supabase Data API exposed schemas.
+CREATE SCHEMA IF NOT EXISTS app_private;
+REVOKE ALL ON SCHEMA app_private FROM PUBLIC, anon;
+GRANT USAGE ON SCHEMA app_private TO authenticated;
+CREATE OR REPLACE FUNCTION app_private.trip_access(p_trip_id uuid, p_permission text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT (select auth.uid()) IS NOT NULL AND p_permission IN ('read','edit','own') AND EXISTS (
+    SELECT 1 FROM public.trips t
+    WHERE t.id = p_trip_id AND (
+      t.owner_id = (select auth.uid()) OR (
+        p_permission <> 'own' AND EXISTS (
+          SELECT 1 FROM public.trip_collaborators c
+          WHERE c.trip_id = t.id
+          AND (p_permission = 'read' OR c.role = 'editor')
+          AND (c.user_id = (select auth.uid()) OR (
+            c.user_id IS NULL AND lower(trim(c.invited_email)) =
+              nullif(lower(trim((select auth.jwt())->>'email')), '')
+          ))
+        )
+      )
+    )
+  );
+$$;
+REVOKE ALL ON FUNCTION app_private.trip_access(uuid,text) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION app_private.trip_access(uuid,text) TO authenticated;
+
+CREATE POLICY trips_member_read ON public.trips FOR SELECT TO authenticated
+USING (owner_id = (select auth.uid()) OR (select app_private.trip_access(id,'read')));
+CREATE POLICY trips_owner_insert ON public.trips FOR INSERT TO authenticated
+WITH CHECK (owner_id = (select auth.uid()));
+CREATE POLICY trips_owner_update ON public.trips FOR UPDATE TO authenticated
+USING (owner_id = (select auth.uid())) WITH CHECK (owner_id = (select auth.uid()));
+CREATE POLICY trips_owner_delete ON public.trips FOR DELETE TO authenticated
+USING (owner_id = (select auth.uid()));
+
+CREATE POLICY trip_spots_member_read ON public.trip_spots FOR SELECT TO authenticated
+USING ((select app_private.trip_access(trip_id,'read')));
+CREATE POLICY trip_spots_editor_insert ON public.trip_spots FOR INSERT TO authenticated
+WITH CHECK ((select app_private.trip_access(trip_id,'edit')));
+CREATE POLICY trip_spots_editor_update ON public.trip_spots FOR UPDATE TO authenticated
+USING ((select app_private.trip_access(trip_id,'edit')))
+WITH CHECK ((select app_private.trip_access(trip_id,'edit')));
+CREATE POLICY trip_spots_editor_delete ON public.trip_spots FOR DELETE TO authenticated
+USING ((select app_private.trip_access(trip_id,'edit')));
+
+-- Owners manage invitations. Invitees can only read their own invitation.
+CREATE POLICY collaborators_read ON public.trip_collaborators FOR SELECT TO authenticated
+USING ((select app_private.trip_access(trip_id,'own')) OR user_id = (select auth.uid()) OR (
+  user_id IS NULL AND lower(trim(invited_email)) = nullif(lower(trim((select auth.jwt())->>'email')), '')
+));
+CREATE POLICY collaborators_owner_insert ON public.trip_collaborators FOR INSERT TO authenticated
+WITH CHECK ((select app_private.trip_access(trip_id,'own')));
+CREATE POLICY collaborators_owner_update ON public.trip_collaborators FOR UPDATE TO authenticated
+USING ((select app_private.trip_access(trip_id,'own')))
+WITH CHECK ((select app_private.trip_access(trip_id,'own')));
+CREATE POLICY collaborators_owner_delete ON public.trip_collaborators FOR DELETE TO authenticated
+USING ((select app_private.trip_access(trip_id,'own')));
+
+CREATE INDEX IF NOT EXISTS trips_owner_access_idx ON public.trips(owner_id);
+CREATE INDEX IF NOT EXISTS trip_spots_trip_access_idx ON public.trip_spots(trip_id);
+CREATE INDEX IF NOT EXISTS collaborators_trip_access_idx ON public.trip_collaborators(trip_id);
+CREATE INDEX IF NOT EXISTS collaborators_user_access_idx ON public.trip_collaborators(user_id);
 
 -- Quotas are server-only and shared across all application instances.
-CREATE TABLE public.api_usage (
+CREATE TABLE IF NOT EXISTS public.api_usage (
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   scope text NOT NULL,
   window_start timestamptz NOT NULL,
@@ -52,43 +147,16 @@ $$;
 REVOKE ALL ON FUNCTION public.consume_api_quota(uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.consume_api_quota(uuid, text) TO service_role;
 
--- Browser uploads are forbidden: the authenticated server validates and re-encodes images.
+-- Direct browser writes to this bucket cannot bypass image validation or quotas.
+DROP POLICY IF EXISTS spot_images_insert_guard ON storage.objects;
+DROP POLICY IF EXISTS spot_images_update_guard ON storage.objects;
+DROP POLICY IF EXISTS spot_images_delete_guard ON storage.objects;
 CREATE POLICY spot_images_insert_guard ON storage.objects AS RESTRICTIVE FOR INSERT TO anon, authenticated
 WITH CHECK (bucket_id <> 'spot-images');
 CREATE POLICY spot_images_update_guard ON storage.objects AS RESTRICTIVE FOR UPDATE TO anon, authenticated
 USING (bucket_id <> 'spot-images') WITH CHECK (bucket_id <> 'spot-images');
 CREATE POLICY spot_images_delete_guard ON storage.objects AS RESTRICTIVE FOR DELETE TO anon, authenticated
 USING (bucket_id <> 'spot-images');
-
--- Parent ownership guards secure trip writes, including direct calls to Supabase.
-ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.trip_spots ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.trip_collaborators ENABLE ROW LEVEL SECURITY;
-CREATE POLICY trips_owner_read ON public.trips FOR SELECT TO authenticated USING (owner_id = auth.uid());
-CREATE POLICY trips_owner_insert ON public.trips FOR INSERT TO authenticated WITH CHECK (owner_id = auth.uid());
-CREATE POLICY trips_insert_guard ON public.trips AS RESTRICTIVE FOR INSERT TO anon, authenticated WITH CHECK (owner_id = auth.uid());
-CREATE POLICY trips_update_guard ON public.trips AS RESTRICTIVE FOR UPDATE TO anon, authenticated USING (owner_id = auth.uid()) WITH CHECK (owner_id = auth.uid());
-CREATE POLICY trips_delete_guard ON public.trips AS RESTRICTIVE FOR DELETE TO anon, authenticated USING (owner_id = auth.uid());
-CREATE POLICY trip_spots_owner_access ON public.trip_spots FOR ALL TO authenticated
-USING (EXISTS (SELECT 1 FROM public.trips WHERE trips.id = trip_spots.trip_id AND owner_id = auth.uid()))
-WITH CHECK (EXISTS (SELECT 1 FROM public.trips WHERE trips.id = trip_spots.trip_id AND owner_id = auth.uid()));
-CREATE POLICY trip_spots_write_guard ON public.trip_spots AS RESTRICTIVE FOR INSERT TO anon, authenticated
-WITH CHECK (EXISTS (SELECT 1 FROM public.trips WHERE trips.id = trip_spots.trip_id AND owner_id = auth.uid()));
-CREATE POLICY trip_spots_update_guard ON public.trip_spots AS RESTRICTIVE FOR UPDATE TO anon, authenticated
-USING (EXISTS (SELECT 1 FROM public.trips WHERE trips.id = trip_spots.trip_id AND owner_id = auth.uid()))
-WITH CHECK (EXISTS (SELECT 1 FROM public.trips WHERE trips.id = trip_spots.trip_id AND owner_id = auth.uid()));
-CREATE POLICY trip_spots_delete_guard ON public.trip_spots AS RESTRICTIVE FOR DELETE TO anon, authenticated
-USING (EXISTS (SELECT 1 FROM public.trips WHERE trips.id = trip_spots.trip_id AND owner_id = auth.uid()));
-CREATE POLICY collaborators_owner_access ON public.trip_collaborators FOR ALL TO authenticated
-USING (EXISTS (SELECT 1 FROM public.trips WHERE trips.id = trip_collaborators.trip_id AND owner_id = auth.uid()))
-WITH CHECK (EXISTS (SELECT 1 FROM public.trips WHERE trips.id = trip_collaborators.trip_id AND owner_id = auth.uid()));
-CREATE POLICY collaborators_write_guard ON public.trip_collaborators AS RESTRICTIVE FOR INSERT TO anon, authenticated
-WITH CHECK (EXISTS (SELECT 1 FROM public.trips WHERE trips.id = trip_collaborators.trip_id AND owner_id = auth.uid()));
-CREATE POLICY collaborators_update_guard ON public.trip_collaborators AS RESTRICTIVE FOR UPDATE TO anon, authenticated
-USING (EXISTS (SELECT 1 FROM public.trips WHERE trips.id = trip_collaborators.trip_id AND owner_id = auth.uid()))
-WITH CHECK (EXISTS (SELECT 1 FROM public.trips WHERE trips.id = trip_collaborators.trip_id AND owner_id = auth.uid()));
-CREATE POLICY collaborators_delete_guard ON public.trip_collaborators AS RESTRICTIVE FOR DELETE TO anon, authenticated
-USING (EXISTS (SELECT 1 FROM public.trips WHERE trips.id = trip_collaborators.trip_id AND owner_id = auth.uid()));
 
 CREATE OR REPLACE FUNCTION public.create_trip_with_stops(
   p_title text, p_duration_days integer, p_stops jsonb,
@@ -126,4 +194,5 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.create_trip_with_stops(text,integer,jsonb,jsonb,text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.create_trip_with_stops(text,integer,jsonb,jsonb,text) TO authenticated;
+NOTIFY pgrst, 'reload schema';
 COMMIT;
