@@ -128,7 +128,7 @@ export default function MapClient({ spots, selectedSpot, onSelectSpot, routeSpot
       )}
 
       {/* Renderizado de Gemas */}
-      {spots.map((spot) => {
+      {spots.filter(spot => !routeSpots.some(r => r.id === spot.id)).map((spot) => {
         if (!spot.latitude || !spot.longitude) return null;
         const lat = parseFloat(spot.latitude);
         const lon = parseFloat(spot.longitude);
@@ -167,6 +167,11 @@ export default function MapClient({ spots, selectedSpot, onSelectSpot, routeSpot
           </Marker>
         );
       })}
+      {routeSpots.filter(s => Number.isFinite(Number(s.latitude)) && Number.isFinite(Number(s.longitude))).map((spot,index) => (
+        <Marker key={`route-${index}`} position={[Number(spot.latitude),Number(spot.longitude)]} icon={createNumberedRouteIcon((spot.routeNumber || index+1)-1, routeSpots.length)}>
+          <Popup><strong>Parada {spot.routeNumber || index+1}: {spot.title}</strong><p>{spot.address_text || ''}</p></Popup>
+        </Marker>
+      ))}
     </MapContainer>
   );
 }

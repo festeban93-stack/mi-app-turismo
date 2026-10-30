@@ -94,3 +94,15 @@ Verificación manual tras ejecutar la migración:
 select to_regprocedure('public.update_trip_with_stops(uuid,integer,text,integer,text,numeric,text,jsonb)') is not null as editor_instalado;
 ```
 Luego editar un viaje a 2 días con tres paradas (días 1, 2, 2), guardar, cerrarlo y volver a abrirlo para verificar persistencia.
+
+### Modo de viaje
+
+En **Mis Viajes → abrir itinerario → Iniciar / continuar viaje**, se muestra la próxima parada,
+se permite completarla, deshacer el último avance, pausar/reanudar y finalizar o reiniciar el recorrido.
+Los puntos confirmados se muestran numerados en el mapa; las líneas conectan paradas y no son rutas por carretera.
+«Cómo llegar» abre Google Maps con las coordenadas confirmadas y no requiere una clave de Google Cloud.
+Cada parada sin ubicación puede ubicarse manualmente en un mapa y confirmarse antes de navegar.
+
+En esta primera versión, avance y coordenadas ajustadas se guardan en localStorage, separados por usuario y viaje.
+No se sincronizan entre dispositivos ni se guardan en Supabase; cambiar el orden/destinos reinicia el avance.
+No se solicita ubicación del dispositivo ni se hace seguimiento GPS. No requiere otra migración SQL.
